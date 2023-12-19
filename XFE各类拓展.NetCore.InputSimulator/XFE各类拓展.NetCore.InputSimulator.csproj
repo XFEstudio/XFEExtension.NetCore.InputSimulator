@@ -4,6 +4,34 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>C:\Users\XFEstudio\Desktop\work\C#\GitHub\XFEstudio\XFEExtension.NetCore.InputSimulator\XFEstudio.pfx</AssemblyOriginatorKeyFile>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>XFE各类拓展.NetCore.InputSimulator</Title>
+    <Authors>XFEstudio</Authors>
+    <Company>寰宇朽力网络科技</Company>
+    <Description>用于实现模拟键盘输入的包</Description>
+    <Copyright>XFE工作室版权所有</Copyright>
+    <PackageProjectUrl>https://github.com/XFEstudio/XFEExtension.NetCore.InputSimulator</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/XFEstudio/XFEExtension.NetCore.InputSimulator</RepositoryUrl>
+    <PackageTags>XFE;拓展;键盘;按键;模拟输入;Input</PackageTags>
+    <PackageReleaseNotes>新增对模拟鼠标操作的支持</PackageReleaseNotes>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
 </Project>
