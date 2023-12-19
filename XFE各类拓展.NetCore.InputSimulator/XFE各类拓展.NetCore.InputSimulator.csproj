@@ -21,10 +21,16 @@
     <PackageReleaseNotes>新增对模拟鼠标操作的支持</PackageReleaseNotes>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <Version>1.0.1</Version>
+    <PackageIcon>logoIcon.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\logoIcon.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
