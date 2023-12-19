@@ -32,6 +32,7 @@ InputSimulator.LocateTo(ScreenPosition.TopLeft);//使得鼠标移动至屏幕的
 using XFE各类拓展.NetCore.InputSimulator;
 
 InputSimulator.MouseClick(MouseButton.Left);//模拟鼠标左键点击
+InputSimulator.MouseWhellRoll(-800);//模拟鼠标滚轮下滑800像素
 ```
 
 ### 获取信息

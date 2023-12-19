@@ -12,7 +12,7 @@ public static partial class InputSimulator
     [LibraryImport("user32.dll", SetLastError = true)]
     private static partial void keybd_event(byte bVk, byte bScan, uint dwFlags, IntPtr dwExtraInfo);
     [LibraryImport("user32.dll")]
-    private static partial void mouse_event(uint dwFlags, int dx, int dy, uint dwData, IntPtr dwExtraInfo);
+    private static partial void mouse_event(uint dwFlags, int dx, int dy, int dwData, IntPtr dwExtraInfo);
     [LibraryImport("user32.dll")]
     private static partial int GetSystemMetrics(int nIndex);
     [LibraryImport("user32.dll")]
@@ -108,7 +108,7 @@ public static partial class InputSimulator
     /// </remarks>
     /// <param name="x">X偏移</param>
     /// <param name="y">Y偏移</param>
-    public static void Move(int x, int y)
+    public static void MouseMove(int x, int y)
     {
         mouse_event(MOUSEEVENTF_MOVE, x, y, 0, IntPtr.Zero);
     }
@@ -116,7 +116,7 @@ public static partial class InputSimulator
     /// 将鼠标定位至
     /// </summary>
     /// <remarks>
-    /// 如果需要相对移动请使用<see cref="Move(int, int)"/>方法
+    /// 如果需要相对移动请使用<see cref="MouseMove(int, int)"/>方法
     /// </remarks>
     /// <param name="x">X坐标</param>
     /// <param name="y">Y坐标</param>
@@ -128,7 +128,7 @@ public static partial class InputSimulator
     /// 将鼠标定位至
     /// </summary>
     /// <remarks>
-    /// 如果需要相对移动请使用<see cref="Move(int, int)"/>方法
+    /// 如果需要相对移动请使用<see cref="MouseMove(int, int)"/>方法
     /// </remarks>
     /// <param name="point">定位到的位置</param>
     public static void LocateTo(Point point)
@@ -139,7 +139,7 @@ public static partial class InputSimulator
     /// 将鼠标定位至
     /// </summary>
     /// <remarks>
-    /// 如果需要相对移动请使用<see cref="Move(int, int)"/>方法
+    /// 如果需要相对移动请使用<see cref="MouseMove(int, int)"/>方法
     /// </remarks>
     /// <param name="screenPosition">屏幕空间位置</param>
     public static void LocateTo(ScreenPosition screenPosition)
@@ -229,6 +229,14 @@ public static partial class InputSimulator
                 break;
         }
     }
+    /// <summary>
+    /// 鼠标滚轮滚动
+    /// </summary>
+    /// <param name="length">滚动长度，负为向下滚动</param>
+    public static void MouseWhellRoll(int length)
+    {
+        mouse_event(MOUSEEVENTF_WHEEL, GetMousePosition().X, GetMousePosition().Y, length, IntPtr.Zero);
+    }
     #endregion
     #region 系统信息获取方法
     /// <summary>
@@ -255,7 +263,7 @@ public static partial class InputSimulator
     public static (double X, double Y) GetMousePointRelatively()
     {
         GetCursorPos(out Point point);
-        return ((double)point.X / GetSystemMetrics(SM_CXSCREEN), (double)point.Y / GetSystemMetrics(SM_CYSCREEN));
+        return ((double)point.X / (GetSystemMetrics(SM_CXSCREEN) - 1), (double)point.Y / (GetSystemMetrics(SM_CYSCREEN) - 1));
     }
     #endregion
 }

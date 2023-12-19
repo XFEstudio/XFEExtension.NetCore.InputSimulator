@@ -18,11 +18,13 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/XFEstudio/XFEExtension.NetCore.InputSimulator</RepositoryUrl>
     <PackageTags>XFE;拓展;键盘;按键;模拟输入;Input</PackageTags>
-    <PackageReleaseNotes>新增对模拟鼠标操作的支持</PackageReleaseNotes>
+    <PackageReleaseNotes>新增对鼠标滚轮操作的支持</PackageReleaseNotes>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
     <PackageIcon>logoIcon.png</PackageIcon>
+    <AssemblyVersion>1.1.5.0</AssemblyVersion>
+    <FileVersion>1.1.5.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
