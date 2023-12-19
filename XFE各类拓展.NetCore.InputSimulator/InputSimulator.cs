@@ -16,10 +16,10 @@ public static partial class InputSimulator
     [LibraryImport("user32.dll")]
     private static partial int GetSystemMetrics(int nIndex);
     [LibraryImport("user32.dll")]
-    static partial void SetCursorPos(int x, int y);
+    private static partial void SetCursorPos(int x, int y);
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    static extern bool GetCursorPos(out Point lpPoint);
+    private static extern bool GetCursorPos(out Point lpPoint);
     #endregion
     #region 常量
     private const int KEYEVENTF_KEYDOWN = 0x0000; // 按键按下
@@ -136,6 +136,48 @@ public static partial class InputSimulator
         LocateTo(point.X, point.Y);
     }
     /// <summary>
+    /// 将鼠标定位至
+    /// </summary>
+    /// <remarks>
+    /// 如果需要相对移动请使用<see cref="Move(int, int)"/>方法
+    /// </remarks>
+    /// <param name="screenPosition">屏幕空间位置</param>
+    public static void LocateTo(ScreenPosition screenPosition)
+    {
+        switch (screenPosition)
+        {
+            case ScreenPosition.TopLeft:
+                LocateTo(0, 0);
+                break;
+            case ScreenPosition.TopRight:
+                LocateTo(GetScreenSize().X - 1, 0);
+                break;
+            case ScreenPosition.Top:
+                LocateTo(GetScreenSize().X / 2, 0);
+                break;
+            case ScreenPosition.Left:
+                LocateTo(0, GetScreenSize().Y / 2);
+                break;
+            case ScreenPosition.Right:
+                LocateTo(GetScreenSize().X - 1, GetScreenSize().Y / 2);
+                break;
+            case ScreenPosition.Center:
+                LocateTo(GetScreenSize().X / 2, GetScreenSize().Y / 2);
+                break;
+            case ScreenPosition.BottomLeft:
+                LocateTo(0, GetScreenSize().Y - 1);
+                break;
+            case ScreenPosition.Bottom:
+                LocateTo(GetScreenSize().X / 2, GetScreenSize().Y - 1);
+                break;
+            case ScreenPosition.BottomRight:
+                LocateTo(GetScreenSize().X - 1, GetScreenSize().Y - 1);
+                break;
+            default:
+                break;
+        }
+    }
+    /// <summary>
     /// 模拟鼠标点击
     /// </summary>
     /// <param name="mouseButton">鼠标按键</param>
@@ -205,6 +247,15 @@ public static partial class InputSimulator
     {
         GetCursorPos(out Point point);
         return point;
+    }
+    /// <summary>
+    /// 获取鼠标位置相对于屏幕大小的百分比
+    /// </summary>
+    /// <returns>百分比，0-1之间(X, Y)</returns>
+    public static (double X, double Y) GetMousePointRelatively()
+    {
+        GetCursorPos(out Point point);
+        return ((double)point.X / GetSystemMetrics(SM_CXSCREEN), (double)point.Y / GetSystemMetrics(SM_CYSCREEN));
     }
     #endregion
 }
