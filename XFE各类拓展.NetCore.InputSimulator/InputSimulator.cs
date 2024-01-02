@@ -37,6 +37,24 @@ public static partial class InputSimulator
     #endregion
     #region 键盘方法
     /// <summary>
+    /// 按住某个按键
+    /// </summary>
+    /// <param name="key">按键</param>
+    public static void KeyDown(char key)
+    {
+        byte keyCode = (byte)key;
+        keybd_event(keyCode, 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
+    }
+    /// <summary>
+    /// 松开某个按键
+    /// </summary>
+    /// <param name="key">按键</param>
+    public static void KeyUp(char key)
+    {
+        byte keyCode = (byte)key;
+        keybd_event(keyCode, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+    }
+    /// <summary>
     /// 按下某个按键
     /// </summary>
     /// <remarks>
