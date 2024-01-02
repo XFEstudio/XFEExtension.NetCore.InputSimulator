@@ -7,7 +7,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <SignAssembly>True</SignAssembly>
-    <AssemblyOriginatorKeyFile>C:\Users\XFEstudio\Desktop\work\C#\GitHub\XFEstudio\XFEExtension.NetCore.InputSimulator\XFEstudio.pfx</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>..\XFEstudio.pfx</AssemblyOriginatorKeyFile>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Title>XFE各类拓展.NetCore.InputSimulator</Title>
     <Authors>XFEstudio</Authors>
