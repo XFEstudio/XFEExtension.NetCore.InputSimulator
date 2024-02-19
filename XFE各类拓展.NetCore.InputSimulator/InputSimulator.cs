@@ -1,5 +1,6 @@
 ﻿using System.Drawing;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace XFE各类拓展.NetCore.InputSimulator;
 
@@ -91,11 +92,20 @@ public static partial class InputSimulator
     /// <param name="keys">待输入按键</param>
     public static void InputKeys(string keys)
     {
-        foreach (var key in keys)
+        foreach (var key in keys.Select(key => key.ToString()))
         {
-            byte keyCode = (byte)key;
-            keybd_event(keyCode, 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
-            keybd_event(keyCode, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+            if (key.ToUpper() == key)
+            {
+                keybd_event(0x10, 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
+                keybd_event(Encoding.ASCII.GetBytes(key).FirstOrDefault(), 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
+                keybd_event(Encoding.ASCII.GetBytes(key).FirstOrDefault(), 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+                keybd_event(0x10, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+            }
+            else
+            {
+                keybd_event(Encoding.ASCII.GetBytes(key.ToUpper()).FirstOrDefault(), 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
+                keybd_event(Encoding.ASCII.GetBytes(key.ToUpper()).FirstOrDefault(), 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+            }
         }
     }
     /// <summary>
@@ -107,12 +117,22 @@ public static partial class InputSimulator
     /// <returns></returns>
     public static async Task InputKeysAsync(string keys, int holdTime = 0, int delay = 0)
     {
-        foreach (var key in keys)
+        foreach (var key in keys.Select(key => key.ToString()))
         {
-            byte keyCode = (byte)key;
-            keybd_event(keyCode, 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
-            await Task.Delay(holdTime);
-            keybd_event(keyCode, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+            if (key.ToUpper() == key)
+            {
+                keybd_event(0x10, 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
+                keybd_event(Encoding.ASCII.GetBytes(key).FirstOrDefault(), 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
+                await Task.Delay(holdTime);
+                keybd_event(Encoding.ASCII.GetBytes(key).FirstOrDefault(), 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+                keybd_event(0x10, 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+            }
+            else
+            {
+                keybd_event(Encoding.ASCII.GetBytes(key.ToUpper()).FirstOrDefault(), 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
+                await Task.Delay(holdTime);
+                keybd_event(Encoding.ASCII.GetBytes(key.ToUpper()).FirstOrDefault(), 0, KEYEVENTF_KEYUP, IntPtr.Zero);
+            }
             await Task.Delay(delay);
         }
     }
