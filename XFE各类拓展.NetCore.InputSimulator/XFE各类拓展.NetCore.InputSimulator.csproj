@@ -18,13 +18,13 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/XFEstudio/XFEExtension.NetCore.InputSimulator</RepositoryUrl>
     <PackageTags>XFE;拓展;键盘;按键;模拟输入;Input</PackageTags>
-    <PackageReleaseNotes>新增对鼠标滚轮操作的支持</PackageReleaseNotes>
+    <PackageReleaseNotes>修复了不能输入大小写字母的问题</PackageReleaseNotes>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <PackageIcon>logoIcon.png</PackageIcon>
-    <AssemblyVersion>1.2.6.0</AssemblyVersion>
-    <FileVersion>1.2.6.0</FileVersion>
+    <AssemblyVersion>1.2.7.1</AssemblyVersion>
+    <FileVersion>1.2.7.1</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
