@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace XFE各类拓展.NetCore.InputSimulator;
+namespace XFEExtension.NetCore.InputSimulator;
 
 /// <summary>
 /// 模拟用户输入

@@ -1,4 +1,4 @@
-﻿namespace XFE各类拓展.NetCore.InputSimulator;
+﻿namespace XFEExtension.NetCore.InputSimulator;
 
 /// <summary>
 /// 鼠标按键

@@ -9,7 +9,7 @@
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>..\XFEstudio.pfx</AssemblyOriginatorKeyFile>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Title>XFE各类拓展.NetCore.InputSimulator</Title>
+    <Title>XFEExtension.NetCore.InputSimulator</Title>
     <Authors>XFEstudio</Authors>
     <Company>寰宇朽力网络科技</Company>
     <Description>用于实现模拟键盘输入的包</Description>
