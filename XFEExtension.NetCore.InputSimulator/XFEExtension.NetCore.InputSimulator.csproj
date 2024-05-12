@@ -18,10 +18,10 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/XFEstudio/XFEExtension.NetCore.InputSimulator</RepositoryUrl>
     <PackageTags>XFE;拓展;键盘;按键;模拟输入;Input</PackageTags>
-    <PackageReleaseNotes>修复了不能输入大小写字母的问题</PackageReleaseNotes>
+    <PackageReleaseNotes>新增获取窗口的缩放倍率方法</PackageReleaseNotes>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <PackageIcon>logoIcon.png</PackageIcon>
   </PropertyGroup>
 

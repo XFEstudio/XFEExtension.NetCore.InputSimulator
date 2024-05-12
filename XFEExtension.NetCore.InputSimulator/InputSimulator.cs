@@ -18,9 +18,15 @@ public static partial class InputSimulator
     private static partial int GetSystemMetrics(int nIndex);
     [LibraryImport("user32.dll")]
     private static partial void SetCursorPos(int x, int y);
-    [DllImport("user32.dll")]
+    [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetCursorPos(out Point lpPoint);
+    private static partial bool GetCursorPos(out Point lpPoint);
+    [LibraryImport("user32.dll")]
+    private static partial IntPtr GetDC(IntPtr hWnd);
+    [LibraryImport("user32.dll")]
+    private static partial int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+    [LibraryImport("user32.dll")]
+    private static partial int GetDpiForWindow(IntPtr hWnd);
     #endregion
     #region 常量
     private const int KEYEVENTF_KEYDOWN = 0x0000; // 按键按下
@@ -302,6 +308,18 @@ public static partial class InputSimulator
     {
         GetCursorPos(out Point point);
         return ((double)point.X / (GetSystemMetrics(SM_CXSCREEN) - 1), (double)point.Y / (GetSystemMetrics(SM_CYSCREEN) - 1));
+    }
+    /// <summary>
+    /// 获取当前窗口的缩放倍率
+    /// </summary>
+    /// <param name="hWnd">窗口句柄</param>
+    /// <returns></returns>
+    public static double GetScalingFactorForWindow(nint hWnd)
+    {
+        var hDC = GetDC(hWnd);
+        var dpi = GetDpiForWindow(hWnd);
+        ReleaseDC(hWnd, hDC);
+        return dpi / 96.0f;
     }
     #endregion
 }
