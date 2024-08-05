@@ -43,4 +43,5 @@ using XFEExtension.NetCore.InputSimulator;
 var screenSize = GetScreenSize();//获取屏幕的宽和高（像素）
 var mousePoint = GetMousePosition();//获取鼠标的位置
 var percentage = GetMousePointRelatively();//获取鼠标相对于屏幕的比值（范围是0-1的double型百分比）
+var isLeftMouseDown = GetMouseDown(MouseButton.Left);//获取鼠标左键是否被按下
 ```
