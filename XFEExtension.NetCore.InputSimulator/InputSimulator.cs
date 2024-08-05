@@ -27,6 +27,8 @@ public static partial class InputSimulator
     private static partial int ReleaseDC(IntPtr hWnd, IntPtr hDC);
     [LibraryImport("user32.dll")]
     private static partial int GetDpiForWindow(IntPtr hWnd);
+    [LibraryImport("user32.dll")]
+    private static partial short GetAsyncKeyState(int vKey);
     #endregion
     #region 常量
     private const int KEYEVENTF_KEYDOWN = 0x0000; // 按键按下
@@ -39,6 +41,9 @@ public static partial class InputSimulator
     private const uint MOUSEEVENTF_MIDDOWN = 0x0020; // 鼠标中键按下
     private const uint MOUSEEVENTF_MIDUP = 0x0040; // 鼠标中键松开
     private const uint MOUSEEVENTF_WHEEL = 0x0800; // 鼠标滚轮
+    private const int VK_LBUTTON = 0x01; // 检测鼠标左键
+    private const int VK_RBUTTON = 0x02; // 检测鼠标右键
+    private const int VK_MBUTTON = 0x04; // 检测鼠标中键
     private const int SM_CXSCREEN = 0; // 屏幕宽度
     private const int SM_CYSCREEN = 1; // 屏幕高度
     #endregion
@@ -100,7 +105,7 @@ public static partial class InputSimulator
     {
         foreach (var key in keys.Select(key => key.ToString()))
         {
-            if (key.ToUpper() == key)
+            if (key.Equals(key, StringComparison.CurrentCultureIgnoreCase))
             {
                 keybd_event(0x10, 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
                 keybd_event(Encoding.ASCII.GetBytes(key).FirstOrDefault(), 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
@@ -125,7 +130,7 @@ public static partial class InputSimulator
     {
         foreach (var key in keys.Select(key => key.ToString()))
         {
-            if (key.ToUpper() == key)
+            if (key.Equals(key, StringComparison.CurrentCultureIgnoreCase))
             {
                 keybd_event(0x10, 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
                 keybd_event(Encoding.ASCII.GetBytes(key).FirstOrDefault(), 0, KEYEVENTF_KEYDOWN, IntPtr.Zero);
@@ -281,6 +286,18 @@ public static partial class InputSimulator
     {
         mouse_event(MOUSEEVENTF_WHEEL, GetMousePosition().X, GetMousePosition().Y, length, IntPtr.Zero);
     }
+    /// <summary>
+    /// 检查鼠标是否按下
+    /// </summary>
+    /// <param name="button">鼠标按键</param>
+    /// <returns>是否被按下</returns>
+    public static bool GetMouseDown(MouseButton button) => button switch
+    {
+        MouseButton.Left => (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0,
+        MouseButton.Right => (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0,
+        MouseButton.Middle => (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0,
+        _ => false
+    };
     #endregion
     #region 系统信息获取方法
     /// <summary>
