@@ -29,6 +29,10 @@ public static partial class InputSimulator
     private static partial int GetDpiForWindow(IntPtr hWnd);
     [LibraryImport("user32.dll")]
     private static partial short GetAsyncKeyState(int vKey);
+    [LibraryImport("user32.dll")]
+    private static partial IntPtr GetDesktopWindow();
+    [LibraryImport("gdi32.dll")]
+    private static partial int GetDeviceCaps(IntPtr hdc, int nIndex);
     #endregion
     #region 常量
     private const int KEYEVENTF_KEYDOWN = 0x0000; // 按键按下
@@ -46,6 +50,12 @@ public static partial class InputSimulator
     private const int VK_MBUTTON = 0x04; // 检测鼠标中键
     private const int SM_CXSCREEN = 0; // 屏幕宽度
     private const int SM_CYSCREEN = 1; // 屏幕高度
+    private const int HORZRES = 8;
+    private const int VERTRES = 10;
+    private const int LOGPIXELSX = 88;
+    private const int LOGPIXELSY = 90;
+    private const int DESKTOPVERTRES = 117;
+    private const int DESKTOPHORZRES = 118;
     #endregion
     #region 键盘方法
     /// <summary>
@@ -199,28 +209,28 @@ public static partial class InputSimulator
                 LocateTo(0, 0);
                 break;
             case ScreenPosition.TopRight:
-                LocateTo(GetScreenSize().X - 1, 0);
+                LocateTo(GetScreenSize().Width - 1, 0);
                 break;
             case ScreenPosition.Top:
-                LocateTo(GetScreenSize().X / 2, 0);
+                LocateTo(GetScreenSize().Width / 2, 0);
                 break;
             case ScreenPosition.Left:
-                LocateTo(0, GetScreenSize().Y / 2);
+                LocateTo(0, GetScreenSize().Height / 2);
                 break;
             case ScreenPosition.Right:
-                LocateTo(GetScreenSize().X - 1, GetScreenSize().Y / 2);
+                LocateTo(GetScreenSize().Width - 1, GetScreenSize().Height / 2);
                 break;
             case ScreenPosition.Center:
-                LocateTo(GetScreenSize().X / 2, GetScreenSize().Y / 2);
+                LocateTo(GetScreenSize().Width / 2, GetScreenSize().Height / 2);
                 break;
             case ScreenPosition.BottomLeft:
-                LocateTo(0, GetScreenSize().Y - 1);
+                LocateTo(0, GetScreenSize().Height - 1);
                 break;
             case ScreenPosition.Bottom:
-                LocateTo(GetScreenSize().X / 2, GetScreenSize().Y - 1);
+                LocateTo(GetScreenSize().Width / 2, GetScreenSize().Height - 1);
                 break;
             case ScreenPosition.BottomRight:
-                LocateTo(GetScreenSize().X - 1, GetScreenSize().Y - 1);
+                LocateTo(GetScreenSize().Width - 1, GetScreenSize().Height - 1);
                 break;
             default:
                 break;
@@ -304,9 +314,21 @@ public static partial class InputSimulator
     /// 获取屏幕的宽高
     /// </summary>
     /// <returns>屏幕宽高</returns>
-    public static Point GetScreenSize()
+    public static Size GetScreenSize()
     {
-        return new Point(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+        return new Size(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+    }
+    /// <summary>
+    /// 获取屏幕的绝对宽高
+    /// </summary>
+    /// <returns></returns>
+    public static Size GetAbsoluteScreenSize()
+    {
+        var hdc = GetDC(GetDesktopWindow());
+        int nWidth = GetDeviceCaps(hdc, DESKTOPHORZRES);
+        int nHeight = GetDeviceCaps(hdc, DESKTOPVERTRES);
+        _ = ReleaseDC(IntPtr.Zero, hdc);
+        return new Size(nWidth, nHeight);
     }
     /// <summary>
     /// 获取鼠标的当前位置
@@ -327,6 +349,14 @@ public static partial class InputSimulator
         return ((double)point.X / (GetSystemMetrics(SM_CXSCREEN) - 1), (double)point.Y / (GetSystemMetrics(SM_CYSCREEN) - 1));
     }
     /// <summary>
+    /// 获取当前缩放倍率
+    /// </summary>
+    /// <returns></returns>
+    public static double GetScalingFactorForWindow()
+    {
+        return GetAbsoluteScreenSize().Width / GetScreenSize().Width;
+    }
+    /// <summary>
     /// 获取当前窗口的缩放倍率
     /// </summary>
     /// <param name="hWnd">窗口句柄</param>
@@ -335,7 +365,7 @@ public static partial class InputSimulator
     {
         var hDC = GetDC(hWnd);
         var dpi = GetDpiForWindow(hWnd);
-        ReleaseDC(hWnd, hDC);
+        _ = ReleaseDC(hWnd, hDC);
         return dpi / 96.0f;
     }
     #endregion
