@@ -21,7 +21,7 @@
     <PackageReleaseNotes>输入改为项目自有 UMDF HID 驱动；驱动、安装器和公开证书嵌入 DLL，首次请求管理员安装及签名者信任。支持相对鼠标、六键加修饰键、侧键、双向滚轮和失联释放；不回退到 SendInput。Unicode 和绝对定位不受此驱动支持。</PackageReleaseNotes>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <Version>4.0.1</Version>
+    <Version>5.0.0</Version>
     <DriverPayloadDirectory>$(MSBuildProjectDirectory)\..\driver\payload\win-x64</DriverPayloadDirectory>
     <PackageIcon>logoIcon.png</PackageIcon>
   </PropertyGroup>
