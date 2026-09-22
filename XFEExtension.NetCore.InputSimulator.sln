@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XFEExtension.NetCore.InputS
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XFEExtension.NetCore.InputSimulator.Tests", "XFEExtension.NetCore.InputSimulator.Tests\XFEExtension.NetCore.InputSimulator.Tests.csproj", "{EB1B4B87-E323-4392-B652-7B340BAF99EF}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XFEExtension.NetCore.InputSimulator.Console", "XFEExtension.NetCore.InputSimulator.Console\XFEExtension.NetCore.InputSimulator.Console.csproj", "{C42A0EB3-54BB-4EA0-84C6-1278BF193AD2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{EB1B4B87-E323-4392-B652-7B340BAF99EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EB1B4B87-E323-4392-B652-7B340BAF99EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EB1B4B87-E323-4392-B652-7B340BAF99EF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C42A0EB3-54BB-4EA0-84C6-1278BF193AD2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C42A0EB3-54BB-4EA0-84C6-1278BF193AD2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C42A0EB3-54BB-4EA0-84C6-1278BF193AD2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C42A0EB3-54BB-4EA0-84C6-1278BF193AD2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

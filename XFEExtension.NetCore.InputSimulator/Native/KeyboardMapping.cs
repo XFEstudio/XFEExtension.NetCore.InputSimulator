@@ -39,7 +39,7 @@ internal static class KeyboardMapping
             return [FromCharacter(character)];
         var mapping = NativeMethods.VkKeyScanExW(character, layout);
         if (mapping == -1 || ((mapping >> 8) & ~7) != 0)
-            throw new ArgumentException($"当前键盘布局不能输入 U+{(int)character:X4}；请使用 TypeText 输入 Unicode 文本。", nameof(character));
+                throw new ArgumentException($"当前键盘布局不能直接输入 U+{(int)character:X4}；HID 驱动需要通过目标程序的输入法输入此字符。", nameof(character));
         var scan = (ScanCode)NativeMethods.MapVirtualKeyExW((uint)(mapping & 0xFF), 4, layout);
         InputValidation.Key(scan);
         List<ScanCode> keys = [];

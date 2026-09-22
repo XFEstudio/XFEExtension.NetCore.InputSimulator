@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -12,20 +12,33 @@
     <Title>XFEExtension.NetCore.InputSimulator</Title>
     <Authors>XFEstudio</Authors>
     <Company>寰宇朽力网络科技</Company>
-    <Description>无需驱动的 Windows 扫描码键鼠输入、Unicode 文本、组合键和可取消的输入序列</Description>
+    <Description>内置 UMDF 虚拟 HID 驱动的 Windows 11 键鼠输入库，支持首次自动部署、组合键和可取消的输入序列</Description>
     <Copyright>XFE工作室版权所有</Copyright>
     <PackageProjectUrl>https://github.com/XFEstudio/XFEExtension.NetCore.InputSimulator</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/XFEstudio/XFEExtension.NetCore.InputSimulator</RepositoryUrl>
     <PackageTags>XFE;拓展;键盘;按键;模拟输入;Input</PackageTags>
-    <PackageReleaseNotes>使用 SendInput 扫描码后端；新增组合键、Unicode、取消与按键清理、侧键、水平滚动、多屏定位及平滑拖动；修复字符映射和缩放精度。仍属于可识别的软件输入。</PackageReleaseNotes>
+    <PackageReleaseNotes>输入改为项目自有 UMDF HID 驱动；驱动、安装器和公开证书嵌入 DLL，首次请求管理员安装及签名者信任。支持相对鼠标、六键加修饰键、侧键、双向滚轮和失联释放；不回退到 SendInput。Unicode 和绝对定位不受此驱动支持。</PackageReleaseNotes>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <Version>3.0.0</Version>
+    <Version>4.0.1</Version>
+    <DriverPayloadDirectory>$(MSBuildProjectDirectory)\..\driver\payload\win-x64</DriverPayloadDirectory>
     <PackageIcon>logoIcon.png</PackageIcon>
   </PropertyGroup>
 
+  <Import Project="$(DriverPayloadDirectory)\payload.props" Condition="Exists('$(DriverPayloadDirectory)\payload.props')" />
+  <PropertyGroup>
+    <PackageVersion Condition="'$(DriverPayloadSigned)' != 'true' and '$(PackageVersion)' == ''">$(Version)-driver-dev</PackageVersion>
+    <PackageVersion Condition="('$(DriverPayloadSigningKind)' == 'local-development' or '$(DriverPayloadSigningKind)' == 'self-signed') and '$(PackageVersion)' == ''">$(Version)-driver-local</PackageVersion>
+  </PropertyGroup>
+
   <ItemGroup>
+    <EmbeddedResource Include="$(DriverPayloadDirectory)\XfeInputDriver.dll;$(DriverPayloadDirectory)\XfeInput.inf;$(DriverPayloadDirectory)\XfeInput.cat;$(DriverPayloadDirectory)\XfeInputSetup.exe;$(DriverPayloadDirectory)\payload.json">
+      <LogicalName>XFE.InputDriver.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="$(DriverPayloadDirectory)\publisher.cer" Condition="'$(DriverPayloadSigned)' == 'true'">
+      <LogicalName>XFE.InputDriver.publisher.cer</LogicalName>
+    </EmbeddedResource>
     <InternalsVisibleTo Include="XFEExtension.NetCore.InputSimulator.Tests" Condition="'$(SignAssembly)' != 'true'" />
     <None Include="..\LICENSE">
       <Pack>True</Pack>
@@ -40,5 +53,10 @@
       <PackagePath>\</PackagePath>
     </None>
   </ItemGroup>
+
+  <Target Name="CheckDriverPayload" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(DriverPayloadDirectory)\payload.json')" Text="Driver payload missing. Run driver/Build-Driver.ps1 then driver/Prepare-Payload.ps1 (-AllowUnsigned for development only)." />
+    <Error Condition="!Exists('$(DriverPayloadDirectory)\payload.props')" Text="Driver payload metadata missing. Run driver/Prepare-Payload.ps1 again." />
+  </Target>
 
 </Project>

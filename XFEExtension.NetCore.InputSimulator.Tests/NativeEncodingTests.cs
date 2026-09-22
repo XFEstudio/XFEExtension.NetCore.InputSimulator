@@ -4,105 +4,54 @@ using XFEExtension.NetCore.InputSimulator.Native;
 
 namespace XFEExtension.NetCore.InputSimulator.Tests;
 
+[TestFixture]
 public class NativeEncodingTests
 {
-    [Fact]
-    public void InputLayoutMatchesWindowsAbi()
+    [Test]
+    public void DriverAbiIsPointerFreeAndStableOnBothArchitectures()
     {
-        Assert.Equal(IntPtr.Size == 8 ? 40 : 28, Marshal.SizeOf<NativeInput>());
-        Assert.Equal(IntPtr.Size == 8 ? 8 : 4, Marshal.OffsetOf<NativeInput>("Data").ToInt32());
-        Assert.Equal(IntPtr.Size == 8 ? 24 : 16, Marshal.SizeOf<KeyboardInput>());
-        Assert.Equal(IntPtr.Size == 8 ? 32 : 24, Marshal.SizeOf<MouseInput>());
-        Assert.Equal(IntPtr.Size == 8 ? 16 : 12, Marshal.OffsetOf<KeyboardInput>("ExtraInfo").ToInt32());
-        Assert.Equal(IntPtr.Size == 8 ? 24 : 20, Marshal.OffsetOf<MouseInput>("ExtraInfo").ToInt32());
+        Assert.Equal(32, Marshal.SizeOf<DriverCommand>());
+        Assert.Equal(16, Marshal.SizeOf<DriverInfo>());
+        Assert.Equal(16, Marshal.OffsetOf<DriverCommand>("X").ToInt32());
+        Assert.Equal(28, Marshal.OffsetOf<DriverCommand>("Reserved").ToInt32());
+        Assert.Equal(64, HidControlProtocol.ReportSize);
     }
 
-    [Theory]
-    [InlineData(ScanCode.W, 0x11, 0x08)]
-    [InlineData(ScanCode.RightControl, 0x1D, 0x09)]
-    [InlineData(ScanCode.RightAlt, 0x38, 0x09)]
-    [InlineData(ScanCode.RightShift, 0x36, 0x08)]
-    [InlineData(ScanCode.Up, 0x48, 0x09)]
-    [InlineData(ScanCode.NumPad8, 0x48, 0x08)]
-    [InlineData(ScanCode.Enter, 0x1C, 0x08)]
-    [InlineData(ScanCode.NumPadEnter, 0x1C, 0x09)]
-    public void KeysUseScanCodesAndCorrectExtensionFlags(ScanCode key, int code, uint flags)
+    [TestCase(ScanCode.W, 0x1A)]
+    [TestCase(ScanCode.RightControl, 0xE4)]
+    [TestCase(ScanCode.RightAlt, 0xE6)]
+    [TestCase(ScanCode.RightShift, 0xE5)]
+    [TestCase(ScanCode.Up, 0x52)]
+    [TestCase(ScanCode.NumPad8, 0x60)]
+    [TestCase(ScanCode.Enter, 0x28)]
+    [TestCase(ScanCode.NumPadEnter, 0x58)]
+    [TestCase(ScanCode.Oem102, 0x64)]
+    [TestCase(ScanCode.D0, 0x27)]
+    [TestCase(ScanCode.F12, 0x45)]
+    public void KeysMapToHidUsages(ScanCode key, int usage) => Assert.Equal(usage, HidKeyMapping.GetUsage(key));
+
+    [Test]
+    public void EveryNamedScanCodeMapsToADistinctHidUsage()
     {
-        var down = SendInputBackend.CreateKeyInput(key, false);
-        var up = SendInputBackend.CreateKeyInput(key, true);
-        Assert.Equal(1u, down.Type);
-        Assert.Equal(0, down.Data.Keyboard.VirtualKey);
-        Assert.Equal(code, down.Data.Keyboard.ScanCode);
-        Assert.Equal(flags, down.Data.Keyboard.Flags);
-        Assert.Equal(flags | 2u, up.Data.Keyboard.Flags);
+        var codes = Enum.GetValues<ScanCode>();
+        var usages = codes.Select(HidKeyMapping.GetUsage).ToArray();
+        Assert.Equal(codes.Length, usages.Distinct().Count());
+        Assert.True(usages.All(value => value is >= 4 and <= 0x73 or >= 0xE0 and <= 0xE7));
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(0xE11D)]
-    [InlineData(0xE000)]
-    [InlineData(0x1011)]
-    [InlineData(0x91)]
-    public void InvalidOrE1CodesAreRejected(int key) =>
-        Assert.Throws<ArgumentOutOfRangeException>(() => SendInputBackend.CreateKeyInput((ScanCode)key, false));
+    [TestCase(0)]
+    [TestCase(0xE11D)]
+    [TestCase(0xE000)]
+    [TestCase(0x1011)]
+    [TestCase(0xE020)]
+    public void InvalidAndUnmappedCodesAreRejected(int key) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => HidKeyMapping.GetUsage((ScanCode)key));
 
-    [Fact]
-    public void UnicodeFlagsDoNotIncludeScanCodeOrExtendedFlags()
-    {
-        foreach (var character in "中🙂")
-        {
-            var down = SendInputBackend.CreateUnicodeInput(character, false).Data.Keyboard;
-            var up = SendInputBackend.CreateUnicodeInput(character, true).Data.Keyboard;
-            Assert.Equal(character, down.ScanCode);
-            Assert.Equal(0, down.VirtualKey);
-            Assert.Equal(4u, down.Flags);
-            Assert.Equal(6u, up.Flags);
-        }
-    }
-
-    [Theory]
-    [InlineData(MouseButton.Left, 0x02u, 0x04u, 0u)]
-    [InlineData(MouseButton.Right, 0x08u, 0x10u, 0u)]
-    [InlineData(MouseButton.Middle, 0x20u, 0x40u, 0u)]
-    [InlineData(MouseButton.XButton1, 0x80u, 0x100u, 1u)]
-    [InlineData(MouseButton.XButton2, 0x80u, 0x100u, 2u)]
-    public void MouseButtonsHaveCorrectFlagsAndPayload(MouseButton button, uint down, uint up, uint data)
-    {
-        var input = SendInputBackend.CreateButtonInput(button, false);
-        Assert.Equal(0u, input.Type);
-        Assert.Equal(down, input.Data.Mouse.Flags);
-        Assert.Equal(data, input.Data.Mouse.MouseData);
-        Assert.Equal(up, SendInputBackend.CreateButtonInput(button, true).Data.Mouse.Flags);
-    }
-
-    [Fact]
-    public void WheelPreservesNegativeSignedDelta()
-    {
-        var vertical = SendInputBackend.CreateWheelInput(-120, false).Data.Mouse;
-        var horizontal = SendInputBackend.CreateWheelInput(240, true).Data.Mouse;
-        Assert.Equal(-120, unchecked((int)vertical.MouseData));
-        Assert.Equal(0x800u, vertical.Flags);
-        Assert.Equal(240u, horizontal.MouseData);
-        Assert.Equal(0x1000u, horizontal.Flags);
-    }
-
-    [Fact]
-    public void MovementFlagsDistinguishRelativePrimaryAndVirtualDesktop()
-    {
-        var relative = SendInputBackend.CreateMoveInput(-15, 25, false, false).Data.Mouse;
-        Assert.Equal((-15, 25, 0x2001u), (relative.X, relative.Y, relative.Flags));
-        Assert.Equal(0xA001u, SendInputBackend.CreateMoveInput(0, 65535, true, false).Data.Mouse.Flags);
-        Assert.Equal(0xE001u, SendInputBackend.CreateMoveInput(65535, 0, true, true).Data.Mouse.Flags);
-        Assert.Throws<ArgumentOutOfRangeException>(() => SendInputBackend.CreateMoveInput(-1, 0, true, true));
-        Assert.Throws<ArgumentException>(() => SendInputBackend.CreateMoveInput(0, 0, false, true));
-    }
-
-    [Theory]
-    [InlineData(-1920, -1080)]
-    [InlineData(-1919, -1079)]
-    [InlineData(0, 0)]
-    [InlineData(3839, 2159)]
-    [InlineData(int.MinValue, int.MaxValue)]
+    [TestCase(-1920, -1080)]
+    [TestCase(-1919, -1079)]
+    [TestCase(0, 0)]
+    [TestCase(3839, 2159)]
+    [TestCase(int.MinValue, int.MaxValue)]
     public void PixelNormalizationTargetsTheCorrectPixelAndClamps(int x, int y)
     {
         var bounds = new Rectangle(-1920, -1080, 5760, 3240);
@@ -113,7 +62,7 @@ public class NativeEncodingTests
         Assert.Equal(Math.Clamp(y, bounds.Top, bounds.Bottom - 1), (int)((long)point.Y * bounds.Height / 65536) + bounds.Top);
     }
 
-    [Fact]
+    [Test]
     public void DegenerateScreenBoundsAreHandled()
     {
         Assert.Equal(new Point(32768, 32768), WindowsDesktop.Normalize(Point.Empty, new Rectangle(0, 0, 1, 1)));

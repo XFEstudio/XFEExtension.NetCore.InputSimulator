@@ -1,174 +1,138 @@
 # XFEExtension.NetCore.InputSimulator
 
-用于 .NET 8 的 Windows 键鼠输入库。3.0 使用 `SendInput` 扫描码替代旧的 `keybd_event` / `mouse_event`，提供组合键、可取消的长按、Unicode 文本、侧键、滚轮、多屏定位、平滑拖动和输入序列。无需安装驱动，没有运行时 NuGet 依赖。
+.NET 10 Windows 键鼠输入库。4.0 使用项目自有的 **UMDF HID 驱动**，通过 Windows 自带 HID 栈提供虚拟键盘和鼠标。驱动 C 源码、安装器源码、INF、构建和验证脚本均在本仓库；没有 Interception 依赖或 SendInput 回退路径。
 
-## 兼容性边界
+## 调用方如何使用
 
-**本库仍发送软件输入，不提供“免驱动且无法被游戏识别”的硬件输入。** 扫描码可以准确表达物理按键，但不会消除 Windows 的软件注入标记。对于三角洲行动等主动拒绝软件输入的目标，不能据此承诺兼容；本项目尚未进行该游戏的实测。
-
-- 扫描码、Unicode 和鼠标模式都属于用户态注入，不是内核驱动或虚拟 HID。直接改用未经文档化的系统调用不能据此宣称输入变成真实硬件。
-- 键盘事件通常由前台窗口接收，鼠标输入作用于当前桌面；没有后台窗口投递保证。
-- Windows 的 UIPI 会限制向更高完整性级别的程序注入。返回成功仅表示系统接受事件，不表示目标程序已经消费。
-- 基础输入支持 Windows；物理坐标查询使用 Windows 10 1703 及以上的线程 DPI API。建议运行环境为 Windows 10/11。
-
-依据：[扫描码与 Unicode 的定义](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-keybdinput)、[SendInput 与 UIPI](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)、[Windows 的注入标记](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-kbdllhookstruct)。
-
-## 快速开始
+签名包的 DLL 内嵌 `XfeInputDriver.dll`、`XfeInput.inf`、`XfeInput.cat`、`XfeInputSetup.exe`、发布者公开证书和校验清单。**使用者不需要自己签名或申请证书。** 引用 DLL/NuGet 后，首次连接自动请求管理员安装；签名者尚未受信任时显示证书指纹，确认后才添加信任。之后可以普通权限运行，无需 Visual Studio、WDK、第三方输入驱动或额外下载。
 
 ```csharp
 using XFEExtension.NetCore.InputSimulator;
 
-// 原有静态调用仍可用，大小写字母对应同一个物理键。
-InputSimulator.PressKey('X');
-
-// 游戏操作建议明确使用扫描码和保持时间；这不保证目标接受注入。
-await InputSimulator.PressKeyAsync(ScanCode.W, holdTime: 100);
-InputSimulator.PressKey(ScanCode.Space);
-InputSimulator.PressCombination(ScanCode.LeftControl, ScanCode.S);
-
-// 向支持文本输入的控件发送 Unicode。
-InputSimulator.TypeText("Hello，世界 🙂");
+// 首次连接发现驱动缺失时，从 DLL 提取驱动包并请求 UAC 安装授权。
+// 已安装后直接连接，不重复安装；不存在软件输入回退。
+using var input = new InputController();
+await input.PressKeyAsync(ScanCode.W, holdTime: 2000);
+await input.PressCombinationAsync([ScanCode.LeftShift, ScanCode.W], holdTime: 1000);
+input.MouseMove(100, -30);
+await input.MouseClickAsync(MouseButton.Left);
+input.MouseWheelRoll(-120);
 ```
 
-同步 `PressKey` / `MouseClick` 默认保持 30ms 再松开，便于轮询输入的应用检测。需要零延迟时使用 `PressKey(ScanCode.W, holdTime: 0)`，或独立控制器的 `MouseClick(MouseButton.Left, holdTime: 0)`。
+自签名包需要用户在首次安装时同意信任发布者的专用代码签名证书；它会加入本机 `Root` 和 `TrustedPublisher`，使系统信任该证书签名的代码。发布者私钥不会分发。设备安装策略仍然适用，系统也可能要求重启。安装器不更改 Secure Boot、内存完整性、测试模式或签名强制策略，不自动重启。
 
-## 独立控制器与按键清理
+包有三种状态：默认源码构建是 `unsigned` / `-driver-dev`，禁止自动安装；自签名包是 `self-signed` / `-driver-local`，需要信任专用证书；公共代码签名发行包标记为 `trusted-publisher`。本地信任方案已经在 Windows 11、Secure Boot 开启的机器上安装成功，但不是微软 WHQL 认证。4.0.1 使用有效期至 **2036-09-23（UTC+8）**的专用 RSA 4096 位代码证书，并附加 RFC 3161 时间戳。证书持续复用于后续构建，期限和私钥备份详见 [签名与分发](driver/SIGNING.md)。
+
+当前驱动支持 **Windows 11 x64**；C# 调用方可以是 x64 或 x86。调用方自己的 .NET 10 应用仍需运行时或采用自包含发布。
+
+可在应用安装阶段提前安装，或检查内嵌状态：
 
 ```csharp
-using XFEExtension.NetCore.InputSimulator;
+Console.WriteLine(DriverDeployment.HasEmbeddedDriver);
+Console.WriteLine(DriverDeployment.IsEmbeddedDriverSigned);
+Console.WriteLine(DriverDeployment.EmbeddedDriverSigningKind);
+Console.WriteLine(DriverDeployment.EmbeddedDriverCertificateExpires);
+Console.WriteLine(DriverDeployment.IsEmbeddedDriverTimestamped);
+DriverDeployment.InstallEmbeddedDriver(); // 需要安装时请求 UAC；不必在每次输入前调用。
+```
 
+驱动文件安装进 Windows 驱动存储，临时提取文件在安装完成后清理。取消 UAC、签名不受信任、需要重启、设备被其他控制器占用等情况均会抛出明确异常。
+
+## 功能与限制
+
+| 功能 | 驱动行为 |
+| --- | --- |
+| 物理键、左右修饰键、组合键 | 将命名 `ScanCode` 转换为 HID Usage；支持同时 6 个普通键及 8 个修饰键 |
+| 长按、取消、序列重复 | 支持；控制器释放及失联约三秒后尝试松开输入 |
+| 鼠标左/右/中/侧键 | 支持 5 个按钮 |
+| 鼠标移动 | 支持相对移动；大位移按有符号 16 位范围拆分 |
+| 垂直、水平滚轮 | 支持；参数必须是 120 的整数倍，大增量分段提交 |
+| `InputKeys` | 按前台键盘布局发送可映射字符，受输入法和修饰键状态影响 |
+| `TypeText` / Unicode | 当前 HID 驱动不支持，明确抛出异常 |
+| 绝对定位、平滑绝对移动/拖动 | 当前 HID 驱动不支持，明确抛出异常 |
+
+虚拟 HID 设备仍可被游戏或其他应用识别和拒绝。已收到用户测试成功的反馈；不同目标环境和版本仍需各自验证，本项目不承诺所有游戏都接受输入。驱动采用 Windows 官方 [UMDF HID 架构](https://learn.microsoft.com/en-us/windows-hardware/drivers/wdf/creating-umdf-hid-minidrivers)，项目代码运行在用户态驱动宿主，内核桥接由系统自带组件负责。
+
+输入会话是独占的：系统同一时间只允许一个实际输入控制器。请在应用内共享一个 `InputController`，或统一使用 `InputSimulator` 静态接口。静态接口在首次发送输入时建立长连接，直至进程退出；仅查询键状态、屏幕或鼠标位置不会打开驱动。不要同时混用静态发送接口和独立控制器。
+
+## 取消与按键清理
+
+```csharp
 using var input = new InputController();
-using var cancellation = new CancellationTokenSource();
-cancellation.CancelAfter(500);
-
+using var cancellation = new CancellationTokenSource(500);
 try
 {
-    // 500ms 后取消；退出时仍尝试逆序释放 W 和左 Shift。
-    await input.PressCombinationAsync(
-        [ScanCode.LeftShift, ScanCode.W],
-        holdTime: 2000,
-        cancellationToken: cancellation.Token);
+    await input.PressCombinationAsync([ScanCode.LeftShift, ScanCode.W],
+        holdTime: 2000, cancellationToken: cancellation.Token);
 }
-catch (OperationCanceledException)
-{
-    // 本次操作已取消。
-}
-
-using (input.HoldKey(ScanCode.LeftControl))
-{
-    await input.PressKeyAsync(ScanCode.C);
-}
-```
-
-- `KeyDown` / `KeyUp`、`MouseDown` / `MouseUp` 显式管理长按。同一实例重复 `KeyDown` 不会增加需要 `KeyUp` 的次数。
-- `HoldKey` / `HoldMouseButton` 支持嵌套与重叠；最后一个作用域退出后才松开。如果已通过 `KeyDown` 手动持有，还需对应的 `KeyUp`。
-- 组合键先校验全部参数，再按顺序按下、逆序释放。中途失败也会尝试释放已经按下的键。
-- `ReleaseAll()` 尝试逆序释放本实例记录的所有键。失败项保留供重试，某次释放失败不会阻止其他键的释放。
-- `Dispose()` 尝试释放持有的键并关闭后端。后端报错时无法保证系统已完成释放，错误会向调用者传播。
-- 各实例独立管理状态，不协调其他实例或真实键盘。同一实例可以并发持有不同键；需要确定的步骤顺序时逐个 `await`，或使用 `InputSequence`。
-- 调用 `ReleaseAll()` 前，先取消并等待正在运行的序列，防止后续步骤重新按键。静态 API 共享一个控制器；需要明确生命周期时使用独立实例。
-
-## 扫描码与文本
-
-```csharp
-using var input = new InputController();
-
-// 左右修饰键、方向键与小键盘是不同的扫描码。
-input.PressKey(ScanCode.RightControl);
-input.PressKey(ScanCode.Up);
-input.PressKey(ScanCode.NumPad8);
-input.PressKey(ScanCode.NumPadEnter);
-
-// 按前台窗口布局模拟字符按键，自动处理 Shift / Ctrl / Alt。
-await input.InputKeysAsync("Abc123!", holdTime: 30, delay: 50);
-
-// Unicode 文本不依赖字符能否映射为物理键。
-await input.TypeTextAsync("中文与 Emoji 🙂", delay: 40);
-```
-
-`ScanCode` 表示 Set 1 物理键位，字母名称按常见 QWERTY 键盘标记。也可显式传入未命名的合法码，例如 `(ScanCode)0xE020`；支持 `0x01..0x7F` 和 `0xE001..0xE07F`。`Pause` 的 E1 特殊序列目前不支持，会拒绝而不是误发为其他键。
-
-`InputKeys` 保留物理按键序列语义，遵循 CapsLock、输入法和当前修饰键状态。它先校验整段字符的布局映射；无法映射的中文等字符会报错，改用 `TypeText`。`TypeText` 通过 `KEYEVENTF_UNICODE` 发送 UTF-16 文本，完整代理对之间不插入等待，不等同于游戏控制按键。回车、Tab 等操作键推荐使用对应的 `ScanCode`。
-
-## 鼠标与多显示器
-
-```csharp
-using System.Drawing;
-using XFEExtension.NetCore.InputSimulator;
-
-using var input = new InputController();
-input.MouseMove(100, -50);                         // 相对移动
-input.LocateTo(-500, 200);                         // 虚拟桌面物理像素，支持副屏负坐标
-input.LocateTo(ScreenPosition.Center);            // 主屏中央
-input.LocateToNormalized(32768, 32768);            // 虚拟桌面中心附近
-await input.LocateToAsync(new Point(800, 500), duration: 300);
-
-input.MouseClick(MouseButton.Left);
-input.MouseClick(MouseButton.XButton1);           // 侧键 1
-await input.MouseDoubleClickAsync(MouseButton.Left);
-input.MouseWheelRoll(-120);                       // 垂直向下一格
-input.MouseHorizontalWheelRoll(120);              // 水平向右一格
-await input.MouseDragAsync(new Point(100, 100), new Point(600, 400), duration: 500);
-
-var desktop = InputSimulator.GetVirtualScreenBounds();
-var cursor = InputSimulator.GetMousePosition();
-var primaryPixels = InputSimulator.GetAbsoluteScreenSize();
-var isWDown = InputSimulator.GetKeyDown(ScanCode.W);
-var isSideButtonDown = InputSimulator.GetMouseDown(MouseButton.XButton1);
-```
-
-绝对定位使用物理像素，临时修改并恢复当前线程的 DPI 上下文，不改变宿主进程设置。越界坐标夹取到虚拟桌面的外接矩形边界；显示器间空隙由 Windows 决定最终指针位置。相对移动受系统指针速度和加速影响。滚轮参数是增量，**120 为一格，不是像素**。
-
-`GetScreenSize()` 保留受调用线程 DPI 感知影响的主屏尺寸；`GetAbsoluteScreenSize()` 返回物理尺寸。无参数 `GetScalingFactorForWindow()` 返回两者宽度的比值，DPI 感知线程上通常为 1；查询指定窗口请传入有效句柄。
-
-## 可重复的输入序列
-
-```csharp
-using var input = new InputController();
-using var cancellation = new CancellationTokenSource();
+catch (OperationCanceledException) { }
 
 var sequence = new InputSequence()
-    .PressKey(ScanCode.W, holdTime: 100)
+    .PressKey(ScanCode.W, 100)
     .Wait(200)
     .MouseMove(20, 0)
     .MouseClick(MouseButton.Left)
-    .MouseWheel(-120)
-    .Wait(500);
-
-await sequence.PlayAsync(input, repeat: 3, cancellationToken: cancellation.Token);
+    .MouseWheel(-120);
+await sequence.PlayAsync(input, repeat: 3);
 ```
 
-播放使用步骤快照，顺序执行，取消或失败后停止后续步骤。每个按键步骤只清理自己持有的按键，不会打断调用者已有的长按。延迟使用 .NET 调度器，不承诺实时精度。构建期间不要并发修改同一个序列。
+`HoldKey` / `HoldMouseButton` 作用域支持嵌套；最后一个作用域退出时释放。`KeyDown` / `KeyUp` 则显式持有和释放。调用 `ReleaseAll` 前应先取消并等待正在执行的任务。释放失败会报告异常，不能保证故障设备已经完成释放。
 
-## 后端扩展
+驱动通过 64 字节 HID Feature 报告接收指令，检查协议版本、长度、保留位、随机会话标识和数值范围。报告队列容量为 64，满时明确报错；入队成功才更新按键状态。客户端每 500ms 续约，约三秒无有效心跳后驱动排队提交键鼠空状态；正常释放、休眠和恢复也重置状态。这是尽力清理机制，设备故障或宿主异常不能保证立即释放。无需拦截或修改现有硬件键鼠驱动。
 
-可通过 `new InputController(new SendInputBackend())` 显式选择后端，也可实现 `IInputBackend` 接入其他输入设备或测试记录器。控制器拥有传入后端，释放控制器时关闭它；不要在多个控制器间共享同一后端实例。发送方法应同步完成，失败时抛出异常。
+## 交互式控制台
 
-当前包只提供无需驱动的 `SendInputBackend`，不包含驱动安装、输入拦截或自动切换后端。
+完成本地构建后，双击 `Start-InputConsole.cmd`，或打开发布的 `InputSimulator.Console.exe`。签名发行版首次选择测试时先完成驱动安装，再开始倒计时。
 
-## 从 2.x 升级
+1. 打开目标程序，控制台输入 `2` 测试 W 长按 2 秒。
+2. 在默认 5 秒倒计时内 Alt+Tab 切回目标，松开切换窗口使用的按键。
+3. 查看是否产生输入，再切回控制台选择下一项。
 
-原有公开方法签名保留，包括 `MouseWhellRoll`，建议改用 `MouseWheelRoll`。提供 `Move` 作为 `MouseMove` 的别名，兼容旧 README 示例。3.0 的行为调整：
+`1` 短按 W，`3` 空格，`4` Shift + W，`5` 鼠标移动，`6` 鼠标按键，`7` 滚轮，`8` 自定义组合及重复次数，`9` 驱动包状态。`T` 修改倒计时，`K` 查看键名，`0` 退出。
 
-- 单键 `char` 重载将字母大小写映射到同一物理键，支持数字、空格、回车、Tab、退格和 Esc。以前强转 `char` 传虚拟键码的写法应改用 `ScanCode`。
-- 修复 `InputKeys` 恒按 Shift、ASCII 编码丢失字符的问题；无法映射的字符不再静默发送错误键码。
-- 同步点击默认保持 30ms，重复 `KeyDown` 合并为一次持有。
-- 非法参数、发送失败等会明确抛出异常；负的保持时间（包括 `-1`）不再被接受。
-- 绝对定位及位置查询统一为物理像素；DPI 不感知的旧调用方需要检查坐标来源。
-- 缩放比使用浮点除法，修复小数部分被截断的问题。
-- 默认构建不再使用 .NET SDK 不支持的 PFX 强名称签名。要保持既有程序集身份，发布者需用原身份对应的 SNK 显式签名。
-
-## 构建与验证
+F8 在倒计时或执行中取消；控制台内也可以 Ctrl+C 取消。F8 通过系统键状态轮询检测，不屏蔽目标对 F8 的处理。预演不会连接驱动、安装驱动或向桌面发送输入：
 
 ```powershell
-dotnet build .\XFEExtension.NetCore.InputSimulator.sln -c Release
-dotnet test .\XFEExtension.NetCore.InputSimulator.sln -c Release
+dotnet run --project .\XFEExtension.NetCore.InputSimulator.Console -c Release -- --dry-run
+# 检查首次安装、连接、心跳和会话释放，不发送按键或鼠标移动：
+dotnet run --project .\XFEExtension.NetCore.InputSimulator.Console -c Release -- --driver-check
+# 已装旧版时，显式更新内嵌驱动和签名证书：
+dotnet run --project .\XFEExtension.NetCore.InputSimulator.Console -c Release -- --driver-install
 ```
 
-测试通过记录后端验证编码、按键释放、取消、异常恢复、Unicode 和序列顺序，不向当前桌面发送真实键鼠输入，也不能替代游戏实测。`INPUT` 的 32/64 位布局、E0 扩展键、侧键及负坐标归一化均有回归测试。
+## 从源码构建
 
-库项目的 Release 构建会在 `bin/Release` 生成 NuGet 包。强名称签名构建示例（签名文件不包含在仓库中，测试使用默认无签名构建）：
+下面是**项目维护者**需要的构建环境，DLL/NuGet 使用者不需要配置：Windows x64、.NET 10 SDK、PowerShell 7、Visual Studio C++ 桌面开发工具。脚本从 NuGet 自动还原固定版本的微软 WDK/SDK，不安装系统级 WDK。
 
 ```powershell
-dotnet build .\XFEExtension.NetCore.InputSimulator\XFEExtension.NetCore.InputSimulator.csproj -c Release -p:SignAssembly=true -p:AssemblyOriginatorKeyFile=C:\keys\XFEstudio.snk
+# 编译 UMDF 驱动和静态链接运行库的安装器，验证报告、会话和 INF，内嵌未签名开发产物。
+pwsh -File .\Build.ps1
+
+# XFEExtension.NetCore.XUnit 4.0.2 独立运行器；测试不会加载驱动或发送真实输入。
+dotnet run --project .\XFEExtension.NetCore.InputSimulator.Tests -c Release --no-build -- --artifacts artifacts/tests
+dotnet run --project .\XFEExtension.NetCore.InputSimulator.Tests -c Release --arch x86 -- --artifacts artifacts/tests-x86
+
+# 带完整内嵌驱动负载的 DLL / NuGet 包。
+dotnet pack .\XFEExtension.NetCore.InputSimulator -c Release --no-build -o .\artifacts\packages
+
+# 自包含控制台单文件 EXE，运行机器不需要另外安装 .NET。
+dotnet publish .\XFEExtension.NetCore.InputSimulator.Console -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:GeneratePackageOnBuild=false -o .\artifacts\input-console
 ```
+
+`driver/Driver.c` 是 UMDF 驱动，`driver/Reports.c` 和 `driver/HidControl.c` 分别实现报告编码、队列和会话状态，`driver/Setup.c` 实现签名者信任及首次安装，`driver/Protocol.h` 与 C# 协议同步。输出在 `artifacts/driver-umdf`，待嵌入负载在忽略版本控制的 `driver/payload/win-x64`。
+
+## 签名和分发
+
+签名由发布者完成，调用方不需要签名环境。本地自签名模式不需要微软硬件审核，要求每台机器首次明确同意信任专用代码证书。首次创建长期证书，后续构建复用已保存的身份：
+
+```powershell
+pwsh -File .\driver\New-SigningCertificate.ps1
+pwsh -File .\Build.ps1 -LocalSigning
+dotnet pack .\XFEExtension.NetCore.InputSimulator -c Release --no-build -o .\artifacts\packages
+# 或一次生成签名 NuGet 和带 .NET 的签名控制台：
+pwsh -File .\Publish-Local.ps1
+```
+
+不要分发私钥；请自行用密码加密备份到离线介质。时间戳不是永久安装保证，当前安装器仍会拒绝过期证书，需要在 2036 年期限前发布新证书签名的更新。已安装 30 天验证版时用 `--driver-install` 升级，普通连接不会自动替换兼容的旧驱动。完整步骤、信任范围和卸载方式见 [驱动签名与分发](driver/SIGNING.md)。
+
+`Validate` 工作流构建 UMDF 驱动、验证原生测试和 C# 测试，并保存未签名驱动及开发 NuGet 包。`Publish Packages` 只接受 `driver/signed/win-x64` 中通过公共签名校验的发行负载；本地信任版通过本地命令分发。配置详见 [发布说明](.github/PUBLISHING.md)。

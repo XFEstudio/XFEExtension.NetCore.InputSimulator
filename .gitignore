@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# XFEExtension.NetCore.XUnit reports
+XfeTestArtifacts/
+
+# Generated driver payload is embedded when building the managed DLL.
+driver/payload/
+# Machine-local certificate selection, never signing keys.
+driver/signing.local.json

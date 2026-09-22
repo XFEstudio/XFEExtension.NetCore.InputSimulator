@@ -3,13 +3,19 @@ using XFEExtension.NetCore.InputSimulator.Native;
 
 namespace XFEExtension.NetCore.InputSimulator;
 
-/// <summary>使用共享的 SendInput 扫描码控制器模拟输入。需要独立生命周期时请创建 InputController。</summary>
+/// <summary>使用共享的 UMDF HID 驱动控制器模拟输入。需要独立生命周期时请创建 InputController。</summary>
 public static class InputSimulator
 {
-    private static readonly InputController Controller = new();
+    private static readonly object SharedSync = new();
+    private static InputController? sharedController;
+    private static InputController Controller
+    {
+        // Do not cache a failed first installation (for example, cancelled UAC).
+        get { lock (SharedSync) return sharedController ??= new InputController(); }
+    }
 
     /// <summary>当前后端的名称。</summary>
-    public static string BackendName => Controller.BackendName;
+    public static string BackendName => "XFE UMDF HID driver";
     /// <summary>按住字符对应的物理键，大小写字母对应同一按键。</summary>
     public static void KeyDown(char key) => Controller.KeyDown(key);
     /// <summary>释放字符对应的物理键。</summary>
@@ -91,7 +97,7 @@ public static class InputSimulator
     /// <summary>水平滚动；120 为一格，正值向右。</summary>
     public static void MouseHorizontalWheelRoll(int delta) => Controller.MouseHorizontalWheelRoll(delta);
     /// <summary>释放共享控制器持有的键；应先取消并等待活动序列结束。</summary>
-    public static void ReleaseAll() => Controller.ReleaseAll();
+    public static void ReleaseAll() { lock (SharedSync) sharedController?.ReleaseAll(); }
 
     /// <summary>检查鼠标键的系统状态。</summary>
     public static bool GetMouseDown(MouseButton button)

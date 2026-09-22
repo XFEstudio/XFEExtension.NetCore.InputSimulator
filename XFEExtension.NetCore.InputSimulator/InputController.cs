@@ -14,8 +14,8 @@ public sealed class InputController : IDisposable
     private readonly List<Button> pressOrder = [];
     private bool disposed;
 
-    /// <summary>创建控制器；默认使用无需驱动的 SendInput 扫描码后端。</summary>
-    public InputController(IInputBackend? backend = null) => this.backend = backend ?? new SendInputBackend();
+    /// <summary>创建控制器；默认连接内置 UMDF HID 驱动，首次部署需要管理员授权和签名者信任。</summary>
+    public InputController(IInputBackend? backend = null) => this.backend = backend ?? new DriverBackend();
 
     /// <summary>正在使用的后端名称。</summary>
     public string BackendName => backend.Name;
@@ -63,7 +63,7 @@ public sealed class InputController : IDisposable
         await WithHeldAsync(HoldKeys(keys), () => Task.Delay(holdTime, cancellationToken)).ConfigureAwait(false);
     }
 
-    /// <summary>按当前前台窗口的键盘布局逐字符模拟按键。中文等文本请使用 TypeText。</summary>
+    /// <summary>按当前前台窗口的键盘布局逐字符模拟按键。驱动不能直接注入 Unicode 文本。</summary>
     /// <remarks>遵循系统 CapsLock、修饰键及输入法状态；不保证最终文本与参数完全相同。</remarks>
     public void InputKeys(string keys)
     {
