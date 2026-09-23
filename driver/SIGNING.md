@@ -13,6 +13,12 @@
 
 可在应用安装阶段主动调用 `DriverDeployment.InstallEmbeddedDriver()`。DLL 内嵌驱动 DLL、INF、CAT、原生安装器、**公开**证书及 SHA-256 清单；不包含私钥。不要求调用方安装 WDK、Visual Studio、C++ 运行库或第三方输入驱动。调用方自己的 .NET 10 应用仍需运行时或自包含发布。
 
+## Git 中的驱动包
+
+`driver/payload/win-x64` 中的 `XfeInputDriver.dll`、`XfeInput.inf`、`XfeInput.cat`、`XfeInputSetup.exe`、公开证书 `publisher.cer` 和两份元数据 `payload.json`、`payload.props` 均纳入 Git。克隆后直接执行 `dotnet build` 会嵌入这份已签名负载，不需要签名私钥或原生编译环境。驱动版本独立于托管库版本，当前内置驱动为 4.0.1.0。
+
+`.gitattributes` 禁止对签名文件（包括受 CAT 覆盖的 INF）转换换行或自动文本合并。修改原生驱动、安装器或 INF 后，需要重新构建、签名并运行 `Prepare-Payload.ps1`，再将全部 7 个文件作为一组更新。默认 `Build.ps1` 会生成未签名开发负载，不应将其作为已签名驱动包提交。构建目录、`driver/signing.local.json` 和 PFX 私钥继续忽略。
+
 ## 本地签名构建
 
 维护者使用专门的非 CA、仅代码签名用途证书，私钥保留在维护者电脑或签名服务。不要在 NuGet、Git 或用户安装包中分发 PFX/私钥。
@@ -41,7 +47,7 @@ pwsh -File .\driver\Prepare-Payload.ps1 -PackageDirectory .\artifacts\driver-loc
 dotnet build .\XFEExtension.NetCore.InputSimulator.sln -c Release -p:GeneratePackageOnBuild=false -warnaserror
 ```
 
-签名输出目录须为空，以免覆盖既有签名包。自签名包标记为 `self-signed`，当前 NuGet 版本为 `4.0.1-driver-local`。它可供明确同意信任的用户安装，属于本地信任分发，不是公共受信任发行版。`-AllowLocalDevelopment` 仍是 `-AllowSelfSigned` 的兼容别名。
+签名输出目录须为空，以免覆盖既有签名包。自签名包标记为 `self-signed`，NuGet 版本在托管库版本后附加 `-driver-local`。它可供明确同意信任的用户安装，属于本地信任分发，不是公共受信任发行版。`-AllowLocalDevelopment` 仍是 `-AllowSelfSigned` 的兼容别名。
 
 ## 证书有效期与更新
 

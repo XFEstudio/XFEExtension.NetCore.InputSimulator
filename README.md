@@ -21,7 +21,7 @@ input.MouseWheelRoll(-120);
 
 自签名包需要用户在首次安装时同意信任发布者的专用代码签名证书；它会加入本机 `Root` 和 `TrustedPublisher`，使系统信任该证书签名的代码。发布者私钥不会分发。设备安装策略仍然适用，系统也可能要求重启。安装器不更改 Secure Boot、内存完整性、测试模式或签名强制策略，不自动重启。
 
-包有三种状态：默认源码构建是 `unsigned` / `-driver-dev`，禁止自动安装；自签名包是 `self-signed` / `-driver-local`，需要信任专用证书；公共代码签名发行包标记为 `trusted-publisher`。本地信任方案已经在 Windows 11、Secure Boot 开启的机器上安装成功，但不是微软 WHQL 认证。4.0.1 使用有效期至 **2036-09-23（UTC+8）**的专用 RSA 4096 位代码证书，并附加 RFC 3161 时间戳。证书持续复用于后续构建，期限和私钥备份详见 [签名与分发](driver/SIGNING.md)。
+包有三种状态：`Build.ps1` 默认重新编译的驱动为 `unsigned` / `-driver-dev`，禁止自动安装；仓库内置的自签名包是 `self-signed` / `-driver-local`，需要信任专用证书；公共代码签名发行包标记为 `trusted-publisher`。本地信任方案已经在 Windows 11、Secure Boot 开启的机器上安装成功，但不是微软 WHQL 认证。4.0.1 驱动使用有效期至 **2036-09-23（UTC+8）**的专用 RSA 4096 位代码证书，并附加 RFC 3161 时间戳。证书持续复用于后续构建，期限和私钥备份详见 [签名与分发](driver/SIGNING.md)。
 
 当前驱动支持 **Windows 11 x64**；C# 调用方可以是 x64 或 x86。调用方自己的 .NET 10 应用仍需运行时或采用自包含发布。
 
@@ -102,7 +102,13 @@ dotnet run --project .\XFEExtension.NetCore.InputSimulator.Console -c Release --
 
 ## 从源码构建
 
-下面是**项目维护者**需要的构建环境，DLL/NuGet 使用者不需要配置：Windows x64、.NET 10 SDK、PowerShell 7、Visual Studio C++ 桌面开发工具。脚本从 NuGet 自动还原固定版本的微软 WDK/SDK，不安装系统级 WDK。
+仓库已包含 `driver/payload/win-x64` 下的完整已签名驱动包。克隆后可直接使用 .NET 10 SDK 构建库和控制台，沿用内置驱动的签名，无需 WDK、C++ 工具或签名私钥：
+
+```powershell
+dotnet build .\XFEExtension.NetCore.InputSimulator.sln -c Release -p:GeneratePackageOnBuild=false -warnaserror
+```
+
+需要修改并重新编译原生驱动或安装器时，**项目维护者**还需 Windows x64、PowerShell 7、Visual Studio C++ 桌面开发工具。脚本从 NuGet 自动还原固定版本的微软 WDK/SDK，不安装系统级 WDK。
 
 ```powershell
 # 编译 UMDF 驱动和静态链接运行库的安装器，验证报告、会话和 INF，内嵌未签名开发产物。
@@ -119,7 +125,7 @@ dotnet pack .\XFEExtension.NetCore.InputSimulator -c Release --no-build -o .\art
 dotnet publish .\XFEExtension.NetCore.InputSimulator.Console -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:GeneratePackageOnBuild=false -o .\artifacts\input-console
 ```
 
-`driver/Driver.c` 是 UMDF 驱动，`driver/Reports.c` 和 `driver/HidControl.c` 分别实现报告编码、队列和会话状态，`driver/Setup.c` 实现签名者信任及首次安装，`driver/Protocol.h` 与 C# 协议同步。输出在 `artifacts/driver-umdf`，待嵌入负载在忽略版本控制的 `driver/payload/win-x64`。
+`driver/Driver.c` 是 UMDF 驱动，`driver/Reports.c` 和 `driver/HidControl.c` 分别实现报告编码、队列和会话状态，`driver/Setup.c` 实现签名者信任及首次安装，`driver/Protocol.h` 与 C# 协议同步。原生构建输出在忽略版本控制的 `artifacts/driver-umdf`；嵌入负载 `driver/payload/win-x64` 中的 7 个发行文件已纳入 Git，包含公开证书，不包含私钥。Git 属性保留签名文件（包括 INF）的原始字节，避免换行转换破坏 CAT 校验。`Build.ps1` 会覆盖嵌入负载；更新仓库驱动包时应完成签名后一起提交全部 7 个文件，不要提交未签名开发产物。
 
 ## 签名和分发
 
