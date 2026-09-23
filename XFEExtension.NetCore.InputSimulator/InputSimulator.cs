@@ -3,14 +3,14 @@ using XFEExtension.NetCore.InputSimulator.Native;
 
 namespace XFEExtension.NetCore.InputSimulator;
 
-/// <summary>使用共享的 UMDF HID 驱动控制器模拟输入。需要独立生命周期时请创建 InputController。</summary>
+/// <summary>使用共享的 UMDF HID 驱动控制器模拟输入；驱动需显式安装。需要独立生命周期时请创建 InputController。</summary>
 public static class InputSimulator
 {
     private static readonly object SharedSync = new();
     private static InputController? sharedController;
     private static InputController Controller
     {
-        // Do not cache a failed first installation (for example, cancelled UAC).
+        // A failed connection can be retried after the caller explicitly installs the driver.
         get { lock (SharedSync) return sharedController ??= new InputController(); }
     }
 

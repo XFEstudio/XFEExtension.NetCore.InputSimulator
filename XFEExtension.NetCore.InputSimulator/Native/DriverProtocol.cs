@@ -6,6 +6,9 @@ internal static class DriverProtocol
 {
     internal const uint Version = 1;
     internal const uint Capabilities = 31;
+
+    internal static bool IsCompatible(DriverInfo info) =>
+        info.Version == Version && info.Capabilities == Capabilities && info.MaxKeys == 6 && info.Reserved == 0;
 }
 
 // Matches driver/Protocol.h on both x86 and x64. No pointers cross this boundary.

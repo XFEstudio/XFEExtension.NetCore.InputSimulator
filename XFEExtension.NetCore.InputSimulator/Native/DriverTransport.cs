@@ -14,26 +14,16 @@ internal sealed unsafe partial class DriverTransport : IDriverTransport
     private Exception? failure;
     private bool disposed;
 
-    internal DriverTransport()
+    internal DriverTransport() : this(FindDevice) { }
+
+    internal DriverTransport(Func<SafeFileHandle?> findDevice)
     {
-        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000) || RuntimeInformation.OSArchitecture != Architecture.X64)
-            throw new PlatformNotSupportedException("内置 UMDF HID 驱动支持 Windows 11 x64。");
-        var opened = FindDevice();
-        if (opened is null)
-        {
-            DriverDeployment.InstallEmbeddedDriver();
-            for (var attempt = 0; attempt < 40 && opened is null; attempt++)
-            {
-                Thread.Sleep(250);
-                opened = FindDevice();
-            }
-        }
-        handle = opened ?? throw new IOException("驱动已安装，但 HID 控制设备尚未启动。请查看设备管理器中的 XFE UMDF 设备状态。");
+        handle = findDevice() ?? throw new InvalidOperationException("未检测到已启动的 XFE HID 控制设备。请先调用 DriverDeployment.CheckDriver() 检测，并在需要安装时显式调用 DriverDeployment.InstallEmbeddedDriver()；连接不会自动安装驱动。");
         try
         {
-            var info = ReadInfo();
-            if (info.Version != DriverProtocol.Version || info.Capabilities != DriverProtocol.Capabilities || info.MaxKeys != 6 || info.Reserved != 0)
-                throw new NotSupportedException("已安装的 XFE UMDF 驱动与本 DLL 协议不匹配。");
+            var info = ReadInfo(handle);
+            if (!DriverProtocol.IsCompatible(info))
+                throw new NotSupportedException("已安装的 XFE UMDF 驱动与本 DLL 协议不匹配，请显式调用 DriverDeployment.InstallEmbeddedDriver() 更新驱动。");
             do { session = BitConverter.ToUInt64(RandomNumberGenerator.GetBytes(sizeof(ulong))); } while (session == 0);
             WriteControl(HidControlProtocol.Acquire);
             heartbeat = new Timer(KeepAlive, null, 500, 500);
@@ -41,11 +31,17 @@ internal sealed unsafe partial class DriverTransport : IDriverTransport
         catch { handle.Dispose(); throw; }
     }
 
-    public DriverInfo Query() { lock (sync) { CheckState(); return ReadInfo(); } }
+    public DriverInfo Query() { lock (sync) { CheckState(); return ReadInfo(handle); } }
     public void Send(DriverCommand command) { lock (sync) { CheckState(); WriteControl(HidControlProtocol.Send, command); } }
     public void Reset() { lock (sync) { CheckState(); WriteControl(HidControlProtocol.Reset); } }
 
-    private DriverInfo ReadInfo()
+    internal static DriverInfo? QueryDevice()
+    {
+        using var opened = FindDevice();
+        return opened is null ? null : ReadInfo(opened);
+    }
+
+    private static DriverInfo ReadInfo(SafeFileHandle handle)
     {
         var bytes = new byte[HidControlProtocol.ReportSize];
         bytes[0] = HidControlProtocol.ReportId;
@@ -99,6 +95,8 @@ internal sealed unsafe partial class DriverTransport : IDriverTransport
 
     private static SafeFileHandle? FindDevice()
     {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000) || RuntimeInformation.OSArchitecture != Architecture.X64)
+            throw new PlatformNotSupportedException("内置 UMDF HID 驱动支持 Windows 11 x64。");
         HidD_GetHidGuid(out var guid);
         var devices = SetupDiGetClassDevsW(in guid, null, 0, 0x12);
         if (devices == -1) throw Error("枚举 HID 设备");

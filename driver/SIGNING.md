@@ -7,11 +7,11 @@
 ## 使用者安装
 
 1. 引用发布者签好的 DLL/NuGet，或运行随包提供的控制台。
-2. 第一次创建 `InputController` 时，库找不到设备便从 DLL 提取驱动及安装器，请求 Windows UAC 管理员安装授权。
+2. 调用 `DriverDeployment.CheckDriver()` 检测设备。需要安装或更新时，显式调用 `DriverDeployment.InstallEmbeddedDriver()`，或选择控制台的 `I` / `--driver-install`；此时才从 DLL 提取驱动及安装器，请求 Windows UAC 管理员授权。
 3. 如果签名者尚未被信任，安装器显示证书名称及 SHA-256 指纹，用户确认后才加入本机信任。自签名代码证书加入 `Root` 和 `TrustedPublisher`；已有公共证书链信任时只按需加入 `TrustedPublisher`。
 4. 安装成功后，程序可用普通权限连接，不再为每次输入请求管理员权限。系统要求重启时会明确报告，不自动重启。
 
-可在应用安装阶段主动调用 `DriverDeployment.InstallEmbeddedDriver()`。DLL 内嵌驱动 DLL、INF、CAT、原生安装器、**公开**证书及 SHA-256 清单；不包含私钥。不要求调用方安装 WDK、Visual Studio、C++ 运行库或第三方输入驱动。调用方自己的 .NET 10 应用仍需运行时或自包含发布。
+引用 DLL、检测状态、创建控制器和发送输入均不会自动安装。驱动缺失时连接立即报告错误；检测不占用输入会话，返回设备是否可访问、协议是否兼容及错误说明。DLL 内嵌驱动 DLL、INF、CAT、原生安装器、**公开**证书及 SHA-256 清单；不包含私钥。不要求调用方安装 WDK、Visual Studio、C++ 运行库或第三方输入驱动。调用方自己的 .NET 10 应用仍需运行时或自包含发布。
 
 ## Git 中的驱动包
 
@@ -55,7 +55,7 @@ dotnet build .\XFEExtension.NetCore.InputSimulator.sln -c Release -p:GeneratePac
 
 这不是“永久签名”。RFC 3161 时间戳用于证明签名时间；Windows 依据签名、时间戳及本机策略验证代码，详见 [SignTool](https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool)。**当前安装器仍要求发布者证书在安装时有效**，即本包的新安装期限仍为 2036 年；时间戳不会跳过这项检查。已安装设备后续是否加载也由 Windows 策略决定。到期前应发布新证书签名的更新，更换证书时用户需要确认新身份，不能修改旧证书或复用旧 CAT。
 
-已安装 30 天验证版的机器应运行新版控制台 `InputSimulator.Console.exe --driver-install`，或显式调用 `DriverDeployment.InstallEmbeddedDriver()`，以更新驱动和信任。仅执行 `--driver-check` 或普通连接会使用已经存在的兼容设备，不能证明安装包已更新。
+已安装 30 天验证版的机器应运行新版控制台 `InputSimulator.Console.exe --driver-install`，或显式调用 `DriverDeployment.InstallEmbeddedDriver()`，以更新驱动和信任。`--driver-check` 只读取设备状态；普通连接会使用已经存在的兼容设备，两者均不安装或更新驱动，也不能证明安装包已更新。
 
 ## 私钥备份与迁移
 
@@ -72,7 +72,7 @@ Export-PfxCertificate -Cert $certificate -FilePath 'E:\PrivateBackup\InputSimula
 
 ## 公共发行及 CI
 
-当前公开发布工作流只接受在干净 Windows runner 上可验证、非自签名的代码签名发行包；不是要求微软审核项目自有内核驱动。将使用同一发布者证书签好的 DLL、INF、CAT、安装器放入 `driver/signed/win-x64`，执行 `Build.ps1 -ReleasePackage`。公开证书从签名中提取并内嵌，打包前检查签名、证书用途和目录成员哈希。默认开发 CI 仅产出 `-driver-dev` 未签名包，自动安装会拒绝该包。
+当前公开发布工作流只接受在干净 Windows runner 上可验证、非自签名的代码签名发行包；不是要求微软审核项目自有内核驱动。将使用同一发布者证书签好的 DLL、INF、CAT、安装器放入 `driver/signed/win-x64`，执行 `Build.ps1 -ReleasePackage`。公开证书从签名中提取并内嵌，打包前检查签名、证书用途和目录成员哈希。默认开发 CI 仅产出 `-driver-dev` 未签名包，安装接口会拒绝该包。
 
 自签名信任版本目前通过上面的本地命令构建分发，不由公共发布工作流上传。长期自签名发行需要维护证书、更新通道和信任说明；不能将“驱动能在本机运行”等同于“任意机器或游戏都会接受”。
 

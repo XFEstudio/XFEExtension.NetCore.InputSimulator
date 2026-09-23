@@ -14,7 +14,7 @@ public sealed class InputController : IDisposable
     private readonly List<Button> pressOrder = [];
     private bool disposed;
 
-    /// <summary>创建控制器；默认连接内置 UMDF HID 驱动，首次部署需要管理员授权和签名者信任。</summary>
+    /// <summary>创建控制器；默认连接已安装的 UMDF HID 驱动，缺失时报告错误，不自动安装。</summary>
     public InputController(IInputBackend? backend = null) => this.backend = backend ?? new DriverBackend();
 
     /// <summary>正在使用的后端名称。</summary>
