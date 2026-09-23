@@ -6,6 +6,8 @@
 
 `validate.yml` 在以下情况运行：向 `master` / `main` 推送、创建或更新 Pull Request、从 Actions 页面手动触发。
 
+`publish-packages.yml` 通过 `branches-ignore: ["**"]` 显式排除所有分支推送。当前 XFE Actions 解析器只处理分支过滤，没有处理 `push.tags`，因此需要保留这条排除规则；仅配置 `tags: ["v*"]` 会导致普通分支推送也触发发布。版本解析同时检查事件类型和完整标签 ref，避免把分支名当作包版本。
+
 先执行 `driver/Test-Payload.ps1` 检查已提交的完整驱动负载及元数据，再直接构建 .NET 10 项目、运行 `XFEExtension.NetCore.XUnit` 测试并打包主库。测试使用 `dotnet run`，返回失败退出码或未发现测试用例时会阻止后续打包。工作流保存 JSON / JUnit XML、已签名驱动及 `.nupkg`，不会发布包。
 
 `signed-driver-payload` 产物包含 Git 中的全部 7 个负载文件：UMDF DLL、INF、CAT、安装器、公开证书及两份元数据。CI 不重编译驱动、不生成或替换签名文件。签名及后续处理见 [驱动签名说明](../driver/SIGNING.md)。
@@ -31,7 +33,7 @@ CI 的仓库完整性检查不替代 Authenticode 信任验证或 CAT 成员验�
 
 创建 GitHub Release 使用内置 `GITHUB_TOKEN` 和 `contents: write` 权限。已有 GitHub Package 必须允许当前仓库写入，否则需调整包的 Actions 访问权限或配置合适的 `GH_PACKAGES_TOKEN`。
 
-## 标签发布
+## 标签发布（GitHub Actions）
 
 1. 确认代码和验证结果已准备好。
 2. 推送版本标签，例如 `v4.0.0` 或 `v4.1.0-preview.1`。
@@ -44,6 +46,8 @@ CI 的仓库完整性检查不替代 Authenticode 信任验证或 CAT 成员验�
 ## 手动发布
 
 在 Actions → Publish Packages → Run workflow 中选择待发布的 ref，填写不带 `v` 的 `version`。支持三段或四段数字版本，以及 `-preview.1` 形式的预发布后缀。
+
+当前 XFE Actions 使用手动发布：选择包含最新工作流的分支，填写例如 `5.0.0` 的版本号后运行 `Publish Packages`。上述自动标签发布适用于 GitHub Actions；当前 XFE Actions 的推送调度按分支处理，不支持这套标签触发方式。排除分支推送不影响手动运行。
 
 `skip_nuget_org=true` 时仅发布至 GitHub Packages。手动运行不创建 GitHub Release，避免产生与当前 ref 无关的版本标签。工作流使用 `--skip-duplicate` 处理已发布的相同版本，不覆盖现有 NuGet 包。
 

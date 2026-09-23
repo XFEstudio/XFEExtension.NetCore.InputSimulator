@@ -2,6 +2,9 @@ name: Publish Packages
 
 on:
   push:
+    # XFE Actions needs explicit branch exclusion because it does not parse tag filters.
+    branches-ignore:
+      - "**"
     tags:
       - "v*"
   workflow_dispatch:
@@ -60,8 +63,10 @@ jobs:
         run: |
           $version = if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
             $env:REQUESTED_VERSION
+          } elseif ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:GITHUB_REF -cmatch '^refs/tags/v(.+)$') {
+            $Matches[1]
           } else {
-            $env:GITHUB_REF_NAME.Substring(1)
+            throw 'Publishing requires a v-prefixed tag push or a manual run with a version.'
           }
           if ($version -cnotmatch '^\d+\.\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
             throw 'Invalid package version. Use a numeric version such as 4.0.0 or 4.1.0-preview.1.'
