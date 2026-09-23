@@ -114,9 +114,9 @@ public static class ClipboardFormat
 
     /// <summary>
     /// Owner-display format. The clipboard owner must display and update the clipboard viewer window, and receive
-    /// the <see cref="ClipboardMessages.WM_ASKCBFORMATNAME"/>, <see cref="ClipboardMessages.WM_HSCROLLCLIPBOARD"/>,
-    /// <see cref="ClipboardMessages.WM_PAINTCLIPBOARD"/>, <see cref="ClipboardMessages.WM_SIZECLIPBOARD"/>, and
-    /// <see cref="ClipboardMessages.WM_VSCROLLCLIPBOARD"/> messages. The <c>hMem</c> parameter must be <c>null</c>.
+    /// the <c>WM_ASKCBFORMATNAME</c>, <c>WM_HSCROLLCLIPBOARD</c>,
+    /// <c>WM_PAINTCLIPBOARD</c>, <c>WM_SIZECLIPBOARD</c>, and
+    /// <c>WM_VSCROLLCLIPBOARD</c> messages. The <c>hMem</c> parameter must be <c>null</c>.
     /// </summary>
     public const uint CF_OWNERDISPLAY = 0x0080;
 
@@ -162,7 +162,7 @@ public static class ClipboardFormat
     /// Start of a range of integer values for private clipboard formats. The range ends with
     /// <see cref="CF_PRIVATELAST"/>. Handles associated with private clipboard formats are not freed
     /// automatically; the clipboard owner must free such handles, typically in response to the
-    /// <see cref="ClipboardMessages.WM_DESTROYCLIPBOARD"/> message.
+    /// <c>WM_DESTROYCLIPBOARD</c> message.
     /// </summary>
     public const uint CF_PRIVATEFIRST = 0x0200;
 
