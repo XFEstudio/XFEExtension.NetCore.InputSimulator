@@ -1,0 +1,47 @@
+[Version]
+Signature="$WINDOWS NT$"
+Class=HIDClass
+ClassGuid={745a17a0-74d3-11d0-b6fe-00a0c90f57da}
+Provider=%Provider%
+DriverVer=09/23/2026,0.1.0.0
+CatalogFile=XfeInputUmProbe.cat
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir=13
+[SourceDisksNames]
+1=%Description%,,,
+[SourceDisksFiles]
+XfeInputUmProbe.dll=1
+[Manufacturer]
+%Provider%=Models,NTamd64.10.0...22000
+[Models.NTamd64.10.0...22000]
+%Description%=Probe,Root\XFEInputUmProbe
+[Probe.NT]
+CopyFiles=DriverCopy
+Include=MsHidUmdf.inf,WUDFRD.inf
+Needs=MsHidUmdf.NT,WUDFRD_LowerFilter.NT
+[Probe.NT.HW]
+Include=MsHidUmdf.inf,WUDFRD.inf
+Needs=MsHidUmdf.NT.HW,WUDFRD_LowerFilter.NT.HW
+[Probe.NT.Services]
+Include=MsHidUmdf.inf,WUDFRD.inf
+Needs=MsHidUmdf.NT.Services,WUDFRD_LowerFilter.NT.Services
+[Probe.NT.Filters]
+Include=WUDFRD.inf
+Needs=WUDFRD_LowerFilter.NT.Filters
+[Probe.NT.Wdf]
+UmdfService=XfeInputUmProbe,DriverInstall
+UmdfServiceOrder=XfeInputUmProbe
+UmdfKernelModeClientPolicy=AllowKernelModeClients
+UmdfFileObjectPolicy=AllowNullAndUnknownFileObjects
+UmdfMethodNeitherAction=Copy
+UmdfFsContextUsePolicy=CanUseFsContext2
+[DriverInstall]
+UmdfLibraryVersion=2.15.0
+ServiceBinary=%13%\XfeInputUmProbe.dll
+[DriverCopy]
+XfeInputUmProbe.dll
+[Strings]
+Provider="XFEstudio Local Development"
+Description="XFE UMDF HID Probe (no input generation)"

@@ -1,0 +1,165 @@
+name: Publish Packages
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version to publish, for example 4.0.0 or 4.1.0-preview.1
+        required: true
+        type: string
+      skip_nuget_org:
+        description: Skip publishing to NuGet.org
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-packages-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: 10.0.x
+  SOLUTION_PATH: XFEExtension.NetCore.InputSimulator.sln
+  PROJECT_PATH: XFEExtension.NetCore.InputSimulator/XFEExtension.NetCore.InputSimulator.csproj
+  TEST_PROJECT_PATH: XFEExtension.NetCore.InputSimulator.Tests/XFEExtension.NetCore.InputSimulator.Tests.csproj
+  TEST_RESULTS_DIR: ${{ github.workspace }}/artifacts/tests
+  PACKAGE_OUTPUT_DIR: ${{ github.workspace }}/artifacts/packages
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      packages: write
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Resolve version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          $version = if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            $env:REQUESTED_VERSION
+          } else {
+            $env:GITHUB_REF_NAME.Substring(1)
+          }
+          if ($version -cnotmatch '^\d+\.\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+            throw 'Invalid package version. Use a numeric version such as 4.0.0 or 4.1.0-preview.1.'
+          }
+          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check publishing credentials
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          SKIP_NUGET_ORG: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_nuget_org }}
+        run: |
+          if ($env:SKIP_NUGET_ORG -ne 'true' -and [string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw 'Set the NUGET_API_KEY repository secret before publishing to NuGet.org.'
+          }
+
+      - name: Build native driver and test HID reports
+        run: ./driver/Build-Driver.ps1
+
+      - name: Verify and embed signed distribution driver
+        run: ./driver/Prepare-Payload.ps1 -PackageDirectory ./driver/signed/win-x64
+
+      - name: Restore
+        run: dotnet restore "$env:SOLUTION_PATH"
+
+      - name: Build
+        run: dotnet build "$env:SOLUTION_PATH" --configuration Release --no-restore -p:GeneratePackageOnBuild=false -p:ContinuousIntegrationBuild=true "-p:Version=$env:PACKAGE_VERSION" "-p:PackageVersion=$env:PACKAGE_VERSION" -warnaserror
+
+      - name: Run XFE tests
+        run: |
+          dotnet run --project "$env:TEST_PROJECT_PATH" --configuration Release --no-build --no-restore -- --artifacts "$env:TEST_RESULTS_DIR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content -LiteralPath (Join-Path $env:TEST_RESULTS_DIR 'test-results.json') -Raw | ConvertFrom-Json
+          if (@($report.results).Count -eq 0) { throw 'The test runner did not execute any tests.' }
+
+      - name: Upload test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-test-results
+          path: ${{ env.TEST_RESULTS_DIR }}/test-results.*
+          if-no-files-found: warn
+
+      - name: Pack
+        run: dotnet pack "$env:PROJECT_PATH" --configuration Release --no-build --no-restore --output "$env:PACKAGE_OUTPUT_DIR" -p:GeneratePackageOnBuild=false -p:ContinuousIntegrationBuild=true "-p:Version=$env:PACKAGE_VERSION" "-p:PackageVersion=$env:PACKAGE_VERSION"
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ env.PACKAGE_VERSION }}
+          path: ${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg
+          if-no-files-found: error
+
+      - name: Publish to GitHub Packages
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
+          PACKAGE_OWNER: ${{ github.repository_owner }}
+        run: |
+          $packages = @(Get-ChildItem -LiteralPath $env:PACKAGE_OUTPUT_DIR -Filter *.nupkg -File)
+          if ($packages.Count -eq 0) { throw 'No NuGet packages were produced.' }
+          foreach ($package in $packages) {
+            dotnet nuget push $package.FullName --source "https://nuget.pkg.github.com/$env:PACKAGE_OWNER/index.json" --api-key "$env:GH_PACKAGES_TOKEN" --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Publish to NuGet.org
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip_nuget_org }}
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          $packages = @(Get-ChildItem -LiteralPath $env:PACKAGE_OUTPUT_DIR -Filter *.nupkg -File)
+          if ($packages.Count -eq 0) { throw 'No NuGet packages were produced.' }
+          foreach ($package in $packages) {
+            dotnet nuget push $package.FullName --source 'https://api.nuget.org/v3/index.json' --api-key "$env:NUGET_API_KEY" --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Create GitHub Release
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: V${{ env.PACKAGE_VERSION }}
+          generate_release_notes: true
+          files: ${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(env.PACKAGE_VERSION, '-') }}
+
+      - name: Publish summary
+        env:
+          SKIP_NUGET_ORG: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_nuget_org }}
+        run: |
+          $nugetStatus = if ($env:SKIP_NUGET_ORG -eq 'true') { 'skipped' } else { 'published' }
+          $releaseStatus = if ($env:GITHUB_EVENT_NAME -eq 'push') { "created for $env:GITHUB_REF_NAME" } else { 'skipped (manual publish)' }
+          @(
+            '## Published packages'
+            ''
+            "- Version: $env:PACKAGE_VERSION"
+            '- GitHub Packages: published'
+            "- NuGet.org: $nugetStatus"
+            "- GitHub Release: $releaseStatus"
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append

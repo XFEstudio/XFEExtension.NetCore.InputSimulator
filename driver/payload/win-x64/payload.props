@@ -1,0 +1,1 @@
+<Project><PropertyGroup><DriverPayloadSigned>true</DriverPayloadSigned><DriverPayloadSigningKind>self-signed</DriverPayloadSigningKind></PropertyGroup></Project>

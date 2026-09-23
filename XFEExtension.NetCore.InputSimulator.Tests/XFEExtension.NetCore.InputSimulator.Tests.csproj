@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="XFEExtension.NetCore.XUnit" Version="4.0.2" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="XFEExtension.NetCore.XUnit.Assertions" />
+    <ProjectReference Include="..\XFEExtension.NetCore.InputSimulator\XFEExtension.NetCore.InputSimulator.csproj" />
+  </ItemGroup>
+
+</Project>

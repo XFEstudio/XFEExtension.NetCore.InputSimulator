@@ -3,6 +3,15 @@
 ###############################################################################
 * text=auto
 
+# Signed payloads must retain exact bytes, including the catalog-covered INF.
+driver/payload/win-x64/XfeInputDriver.dll binary
+driver/payload/win-x64/XfeInput.inf binary
+driver/payload/win-x64/XfeInput.cat binary
+driver/payload/win-x64/XfeInputSetup.exe binary
+driver/payload/win-x64/publisher.cer binary
+driver/payload/win-x64/payload.json text eol=lf
+driver/payload/win-x64/payload.props text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

@@ -361,3 +361,20 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# XFEExtension.NetCore.XUnit reports
+XfeTestArtifacts/
+
+# Track only the signed driver payload embedded in the managed DLL.
+driver/payload/*
+!driver/payload/win-x64/
+driver/payload/win-x64/*
+!driver/payload/win-x64/XfeInputDriver.dll
+!driver/payload/win-x64/XfeInput.inf
+!driver/payload/win-x64/XfeInput.cat
+!driver/payload/win-x64/XfeInputSetup.exe
+!driver/payload/win-x64/publisher.cer
+!driver/payload/win-x64/payload.json
+!driver/payload/win-x64/payload.props
+# Machine-local certificate selection, never signing keys.
+driver/signing.local.json

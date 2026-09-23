@@ -1,0 +1,88 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: 10.0.x
+  SOLUTION_PATH: XFEExtension.NetCore.InputSimulator.sln
+  PROJECT_PATH: XFEExtension.NetCore.InputSimulator/XFEExtension.NetCore.InputSimulator.csproj
+  TEST_PROJECT_PATH: XFEExtension.NetCore.InputSimulator.Tests/XFEExtension.NetCore.InputSimulator.Tests.csproj
+  TEST_RESULTS_DIR: ${{ github.workspace }}/artifacts/tests
+  PACKAGE_OUTPUT_DIR: ${{ github.workspace }}/artifacts/packages
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Build UMDF driver and test HID reports and sessions
+        run: ./driver/Build-Driver.ps1
+
+      - name: Embed development driver payload
+        run: ./driver/Prepare-Payload.ps1 -AllowUnsigned
+
+      - name: Upload unsigned driver build
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-driver
+          path: |
+            artifacts/driver-umdf/*.dll
+            artifacts/driver-umdf/*.inf
+            artifacts/driver-umdf/*.cat
+            artifacts/driver-umdf/*.pdb
+            artifacts/driver-umdf/XfeInputSetup.exe
+          if-no-files-found: error
+
+      - name: Restore
+        run: dotnet restore "$env:SOLUTION_PATH"
+
+      - name: Build
+        run: dotnet build "$env:SOLUTION_PATH" --configuration Release --no-restore -p:GeneratePackageOnBuild=false -p:ContinuousIntegrationBuild=true -warnaserror
+
+      - name: Run XFE tests
+        run: |
+          dotnet run --project "$env:TEST_PROJECT_PATH" --configuration Release --no-build --no-restore -- --artifacts "$env:TEST_RESULTS_DIR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content -LiteralPath (Join-Path $env:TEST_RESULTS_DIR 'test-results.json') -Raw | ConvertFrom-Json
+          if (@($report.results).Count -eq 0) { throw 'The test runner did not execute any tests.' }
+
+      - name: Upload test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ${{ env.TEST_RESULTS_DIR }}/test-results.*
+          if-no-files-found: warn
+
+      - name: Pack
+        run: dotnet pack "$env:PROJECT_PATH" --configuration Release --no-build --no-restore --output "$env:PACKAGE_OUTPUT_DIR" -p:GeneratePackageOnBuild=false -p:ContinuousIntegrationBuild=true
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: development-packages-unsigned-driver
+          path: ${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg
+          if-no-files-found: error
