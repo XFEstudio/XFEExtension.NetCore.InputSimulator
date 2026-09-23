@@ -38,22 +38,21 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Build UMDF driver and test HID reports and sessions
-        run: ./driver/Build-Driver.ps1
+      - name: Verify committed signed driver payload integrity
+        run: ./driver/Test-Payload.ps1
 
-      - name: Embed development driver payload
-        run: ./driver/Prepare-Payload.ps1 -AllowUnsigned
-
-      - name: Upload unsigned driver build
+      - name: Upload committed signed driver payload
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-driver
+          name: signed-driver-payload
           path: |
-            artifacts/driver-umdf/*.dll
-            artifacts/driver-umdf/*.inf
-            artifacts/driver-umdf/*.cat
-            artifacts/driver-umdf/*.pdb
-            artifacts/driver-umdf/XfeInputSetup.exe
+            driver/payload/win-x64/XfeInputDriver.dll
+            driver/payload/win-x64/XfeInput.inf
+            driver/payload/win-x64/XfeInput.cat
+            driver/payload/win-x64/XfeInputSetup.exe
+            driver/payload/win-x64/publisher.cer
+            driver/payload/win-x64/payload.json
+            driver/payload/win-x64/payload.props
           if-no-files-found: error
 
       - name: Restore
@@ -83,6 +82,6 @@ jobs:
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: development-packages-unsigned-driver
+          name: packages-signed-driver
           path: ${{ env.PACKAGE_OUTPUT_DIR }}/*.nupkg
           if-no-files-found: error

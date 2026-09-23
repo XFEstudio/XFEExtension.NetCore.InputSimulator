@@ -77,11 +77,8 @@ jobs:
             throw 'Set the NUGET_API_KEY repository secret before publishing to NuGet.org.'
           }
 
-      - name: Build native driver and test HID reports
-        run: ./driver/Build-Driver.ps1
-
-      - name: Verify and embed signed distribution driver
-        run: ./driver/Prepare-Payload.ps1 -PackageDirectory ./driver/signed/win-x64
+      - name: Verify committed signed driver payload integrity
+        run: ./driver/Test-Payload.ps1
 
       - name: Restore
         run: dotnet restore "$env:SOLUTION_PATH"
