@@ -155,4 +155,4 @@ pwsh -File .\Publish-Local.ps1
 
 不要分发私钥；请自行用密码加密备份到离线介质。时间戳不是永久安装保证，当前安装器仍会拒绝过期证书，需要在 2036 年期限前发布新证书签名的更新。已安装 30 天验证版时用 `--driver-install` 升级，普通连接不会自动替换兼容的旧驱动。完整步骤、信任范围和卸载方式见 [驱动签名与分发](driver/SIGNING.md)。
 
-`Validate` 工作流构建 UMDF 驱动、验证原生测试和 C# 测试，并保存未签名驱动及开发 NuGet 包。`Publish Packages` 只接受 `driver/signed/win-x64` 中通过公共签名校验的发行负载；本地信任版通过本地命令分发。配置详见 [发布说明](.github/PUBLISHING.md)。
+`Validate` 和 `Publish Packages` 工作流均直接复用 Git 中的 `driver/payload/win-x64`，检查文件 SHA-256、清单及公开证书元数据，再构建和测试 C# 项目、打包 NuGet；不运行原生编译或重新签名。运行机只需 Windows、PowerShell 7 和 .NET 10 SDK，不需要 C++ Build Tools、WDK 或证书私钥，也不会导入证书信任。修改原生代码时，维护者仍需在签名机执行原生构建、测试、签名及 CAT 校验后更新整套负载。配置详见 [发布说明](.github/PUBLISHING.md)。

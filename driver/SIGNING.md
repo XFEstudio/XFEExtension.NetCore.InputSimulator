@@ -70,11 +70,13 @@ Export-PfxCertificate -Cert $certificate -FilePath 'E:\PrivateBackup\InputSimula
 
 路径按自己的离线介质修改，备份文件和密码分开保管；仓库已忽略 `*.pfx`。迁移机器时用 `Import-PfxCertificate` 将加密备份导入新用户的 `My` 存储，并恢复证书选择文件。缺失选择文件时也可直接指定原证书指纹构建。若私钥丢失且没有备份，将无法继续使用同一身份签名；若泄露，应停止分发该证书签名的包，更新签名身份并通知使用者移除旧信任。
 
-## 公共发行及 CI
+## 分发及 CI
 
-当前公开发布工作流只接受在干净 Windows runner 上可验证、非自签名的代码签名发行包；不是要求微软审核项目自有内核驱动。将使用同一发布者证书签好的 DLL、INF、CAT、安装器放入 `driver/signed/win-x64`，执行 `Build.ps1 -ReleasePackage`。公开证书从签名中提取并内嵌，打包前检查签名、证书用途和目录成员哈希。默认开发 CI 仅产出 `-driver-dev` 未签名包，安装接口会拒绝该包。
+验证和发布工作流直接复用 `driver/payload/win-x64` 中已提交的签名驱动包，不要求 runner 安装 C++ Build Tools、WDK 或签名私钥。`driver/Test-Payload.ps1` 检查完整文件集合、SHA-256、打包元数据及公开证书用途和有效期。这是仓库负载完整性检查，不是 Windows Authenticode 信任或 CAT 成员验证；后两项由维护者在签名机运行 `Prepare-Payload.ps1` 时完成。CI 不导入发布者证书、不修改系统信任、不安装驱动。
 
-自签名信任版本目前通过上面的本地命令构建分发，不由公共发布工作流上传。长期自签名发行需要维护证书、更新通道和信任说明；不能将“驱动能在本机运行”等同于“任意机器或游戏都会接受”。
+当前自签名负载也可由 `Publish Packages` 发布到 NuGet.org / GitHub Packages；上传软件包不改变驱动的 `self-signed` 类型，使用者首次安装仍需确认发布者信任。本地默认打包附加 `-driver-local` 后缀，工作流显式按标签或手动输入指定 NuGet 版本。更新原生代码后，先在签名机重新构建、运行原生测试、签名及验证，再提交全部 7 个负载文件。长期自签名发行需要维护证书、更新通道和信任说明。
+
+另行使用公共代码证书的维护者仍可将签好的原生文件放入 `driver/signed/win-x64`，运行 `Build.ps1 -ReleasePackage`；该原生构建路径需要 C++ 环境，CI 复用已提交负载时不调用它。
 
 ## 卸载
 
