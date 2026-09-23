@@ -10,7 +10,7 @@
 
 `unsigned-driver` 产物包含 UMDF DLL、INF、CAT、PDB 及安装器。CI 不使用签名私钥、不生成或提交微软审核 CAB。签名及后续处理见 [驱动签名说明](../driver/SIGNING.md)。
 
-开发 NuGet 包默认带 `-driver-dev` 后缀。完整驱动文件作为资源嵌入 DLL；它不会自动安装未签名负载。CI 不安装驱动或修改 runner 的证书信任与启动安全策略。
+开发 NuGet 包默认带 `-driver-dev` 后缀。完整驱动文件作为资源嵌入 DLL；显式安装接口会拒绝未签名负载。CI 不安装驱动或修改 runner 的证书信任与启动安全策略。
 
 自动测试使用记录后端，不向 runner 的桌面发送真实输入。Windows CI 使用默认的 x64 .NET 主机；本地可按 README 中的命令额外运行 x86 测试。
 
@@ -20,7 +20,7 @@
 
 当前 `-driver-local` 自签名包供用户明确授权信任后安装。维护者首次运行 `driver/New-SigningCertificate.ps1` 创建十年专用证书，再通过 `Build.ps1 -LocalSigning` 复用身份、签名并请求 RFC 3161 时间戳；也支持显式指定 `-LocalCertificateThumbprint '<指纹>'`。私钥不进入工作流或包。公共发布工作流不会将它误发布为公共受信任版本，也不会在 runner 上导入本地 Root 证书。
 
-签名是维护者的发布步骤。调用方只需要 DLL/NuGet，首次使用由内嵌安装器申请管理员授权和所需的签名者信任；无需自己签名、下载驱动或配置 WDK。`driver/signed/win-x64` 中只保存发行二进制，不保存私钥。
+签名是维护者的发布步骤。调用方只需要 DLL/NuGet，使用 `DriverDeployment.CheckDriver()` 检测设备，在显式调用 `InstallEmbeddedDriver()` 时由内嵌安装器申请管理员授权和所需的签名者信任。连接和输入均不会自动安装；无需自己签名、下载驱动或配置 WDK。`driver/signed/win-x64` 中只保存发行二进制，不保存私钥。
 
 在 GitHub 仓库的 Settings → Secrets and variables → Actions 中配置：
 

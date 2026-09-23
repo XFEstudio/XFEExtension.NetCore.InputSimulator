@@ -13,7 +13,7 @@ internal static class Program
         {
             Console.WriteLine("InputSimulator.Console.exe [--dry-run | --driver-check | --driver-install]");
             Console.WriteLine("无参数：交互式真实输入测试；--dry-run：只打印事件，跳过倒计时，不发送输入。");
-            Console.WriteLine("真实输入使用内置 UMDF HID 驱动；首次需要管理员安装及签名者信任。--driver-check 仅验证连接和心跳，不按键、不移动鼠标。");
+            Console.WriteLine("真实输入使用内置 UMDF HID 驱动；不会自动安装。--driver-check 只检测设备和协议，不安装、不占用输入会话。");
             Console.WriteLine("--driver-install：安装或更新为内嵌驱动包，更换签名证书时使用；需要管理员授权。");
             Console.WriteLine("选择测试后切回目标窗口；默认倒计时 5 秒，F8 取消；Ctrl+C 取消当前操作。");
             return 0;
@@ -24,14 +24,7 @@ internal static class Program
             try
             {
                 if (args[0] == "--driver-install") DriverDeployment.InstallEmbeddedDriver();
-                string name;
-                using (var driver = new DriverBackend())
-                {
-                    name = driver.Name;
-                    await Task.Delay(4000);
-                }
-                Console.WriteLine($"连接、心跳及释放成功：{name}；签名：{DriverDeployment.EmbeddedDriverSigningKind}；时间戳：{DriverDeployment.IsEmbeddedDriverTimestamped}；证书到期：{DriverDeployment.EmbeddedDriverCertificateExpires:O}");
-                return 0;
+                return PrintDriverStatus().IsAvailable ? 0 : 1;
             }
             catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
         }
@@ -54,8 +47,8 @@ internal static class Program
         }
 
         Console.WriteLine("=== InputSimulator 手动测试 / .NET 10 ===");
-        Console.WriteLine(preview ? "预演模式：只打印事件，不加载驱动或发送真实输入。" : "后端：项目自有 UMDF 虚拟 HID 驱动。启动菜单不会发送输入。");
-        Console.WriteLine($"内嵌驱动：{(DriverDeployment.HasEmbeddedDriver ? "有" : "缺失")}；签名：{(DriverDeployment.IsEmbeddedDriverSigned ? "已校验" : "开发版，未签名，不能自动安装")}");
+        Console.WriteLine(preview ? "预演模式：只打印事件，不加载驱动或发送真实输入。" : "后端：项目自有 UMDF 虚拟 HID 驱动。启动和测试均不会自动安装；9 检测，I 安装或更新。");
+        Console.WriteLine($"内嵌驱动：{(DriverDeployment.HasEmbeddedDriver ? "有" : "缺失")}；签名：{(DriverDeployment.IsEmbeddedDriverSigned ? "已校验" : "开发版，未签名，不能安装")}");
         Console.WriteLine($"签名类型：{DriverDeployment.EmbeddedDriverSigningKind}；证书到期：{DriverDeployment.EmbeddedDriverCertificateExpires:yyyy-MM-dd}");
         Console.WriteLine("驱动设备仍可被目标识别；发送成功不代表游戏已接受。");
         Console.WriteLine("真实测试时请在倒计时内 Alt+Tab 切回目标，并松开切换窗口使用的按键。");
@@ -72,7 +65,7 @@ internal static class Program
             Console.WriteLine("3  空格 100ms            4  Shift + W 长按 2 秒");
             Console.WriteLine("5  鼠标向右相对移动      6  鼠标按键测试（可选左/右/中/侧键）");
             Console.WriteLine("7  滚轮向下一格          8  自定义键/组合键、保持时间和次数");
-            Console.WriteLine("9  查看驱动状态（此驱动不支持直接 Unicode 输入和绝对鼠标定位）");
+            Console.WriteLine("9  检测驱动状态          I  安装或更新驱动（需要管理员授权）");
             Console.WriteLine($"T  设置倒计时（当前 {countdown} 秒）   K  查看可用键名   0  退出");
             Console.Write("请选择 > ");
             var choice = Console.ReadLine()?.Trim().ToUpperInvariant();
@@ -94,8 +87,19 @@ internal static class Program
 
                 if (choice == "9")
                 {
-                    Console.WriteLine($"内嵌驱动：{DriverDeployment.HasEmbeddedDriver}；已校验签名：{DriverDeployment.IsEmbeddedDriverSigned}");
-                    Console.WriteLine("签名版首次测试时自动安装；系统同时只允许一个控制器连接。最多同时按住 6 个普通键及 8 个修饰键。");
+                    if (preview) Console.WriteLine("预演模式：跳过设备检测，不打开驱动。");
+                    else PrintDriverStatus();
+                    Console.WriteLine("系统同时只允许一个控制器连接。最多同时按住 6 个普通键及 8 个修饰键；不支持直接 Unicode 输入和绝对鼠标定位。");
+                    continue;
+                }
+                if (choice == "I")
+                {
+                    if (preview) Console.WriteLine("预演模式：跳过驱动安装，不请求管理员授权。");
+                    else
+                    {
+                        DriverDeployment.InstallEmbeddedDriver();
+                        PrintDriverStatus();
+                    }
                     continue;
                 }
                 var test = CreateTest(choice);
@@ -113,13 +117,23 @@ internal static class Program
             catch (Exception error)
             {
                 exitCode = 1;
-                Console.Error.WriteLine($"测试未完成：{error.Message}");
+                Console.Error.WriteLine($"操作未完成：{error.Message}");
                 if (error is AggregateException aggregate)
                     foreach (var inner in aggregate.Flatten().InnerExceptions)
                         Console.Error.WriteLine($"  {inner.Message}");
-                Console.WriteLine("请按错误提示检查驱动签名、安装和设备占用情况。清理报错时请手动按下并松开对应键。");
+                Console.WriteLine("可选择 9 检测驱动，或 I 显式安装或更新。清理报错时请手动按下并松开对应键。");
             }
         }
+    }
+
+    private static DriverCheckResult PrintDriverStatus()
+    {
+        var result = DriverDeployment.CheckDriver();
+        Console.WriteLine($"驱动状态：{result.Status}；{result.Message}");
+        Console.WriteLine($"内嵌包签名：{DriverDeployment.EmbeddedDriverSigningKind}；时间戳：{DriverDeployment.IsEmbeddedDriverTimestamped}；证书到期：{DriverDeployment.EmbeddedDriverCertificateExpires:O}");
+        if (!result.IsAvailable)
+            Console.WriteLine("需要安装或更新时，选择 I 或运行 --driver-install；检测不会触发安装。");
+        return result;
     }
 
     private static ManualTest? CreateTest(string choice) => choice switch
@@ -218,7 +232,7 @@ internal static class Program
         var watcher = preview ? Task.CompletedTask : WatchStopKeyAsync(cancellation, stopWatching.Token);
         try
         {
-            // Complete driver connection / first-time UAC installation before starting the countdown.
+            // Connect to the already installed driver before starting the countdown.
             using var input = new InputController(preview ? new PreviewBackend() : new DriverBackend());
             Console.WriteLine($"\n本次测试：{test.Name}");
             if (!preview)

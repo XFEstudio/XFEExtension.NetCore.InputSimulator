@@ -4,13 +4,19 @@
 
 ## 调用方如何使用
 
-签名包的 DLL 内嵌 `XfeInputDriver.dll`、`XfeInput.inf`、`XfeInput.cat`、`XfeInputSetup.exe`、发布者公开证书和校验清单。**使用者不需要自己签名或申请证书。** 引用 DLL/NuGet 后，首次连接自动请求管理员安装；签名者尚未受信任时显示证书指纹，确认后才添加信任。之后可以普通权限运行，无需 Visual Studio、WDK、第三方输入驱动或额外下载。
+签名包的 DLL 内嵌 `XfeInputDriver.dll`、`XfeInput.inf`、`XfeInput.cat`、`XfeInputSetup.exe`、发布者公开证书和校验清单。**使用者不需要自己签名或申请证书。** 引用 DLL/NuGet、创建控制器和发送输入都不会自动安装驱动。由调用方使用 `DriverDeployment.CheckDriver()` 检测，在自己的安装按钮或命令中显式调用 `DriverDeployment.InstallEmbeddedDriver()` 才请求管理员授权。安装后可以普通权限运行，无需 Visual Studio、WDK、第三方输入驱动或额外下载。
 
 ```csharp
 using XFEExtension.NetCore.InputSimulator;
 
-// 首次连接发现驱动缺失时，从 DLL 提取驱动包并请求 UAC 安装授权。
-// 已安装后直接连接，不重复安装；不存在软件输入回退。
+// 只检测设备和协议；不安装、不请求 UAC、不占用输入会话。
+var driver = DriverDeployment.CheckDriver();
+if (!driver.IsAvailable)
+{
+    Console.WriteLine($"{driver.Status}: {driver.Message}");
+    return; // 由调用方在需要时提供安装入口。
+}
+
 using var input = new InputController();
 await input.PressKeyAsync(ScanCode.W, holdTime: 2000);
 await input.PressCombinationAsync([ScanCode.LeftShift, ScanCode.W], holdTime: 1000);
@@ -19,13 +25,22 @@ await input.MouseClickAsync(MouseButton.Left);
 input.MouseWheelRoll(-120);
 ```
 
+在调用方的“安装或更新驱动”操作中单独执行：
+
+```csharp
+DriverDeployment.InstallEmbeddedDriver(); // 此处才请求 UAC 和所需的签名者信任。
+Console.WriteLine(DriverDeployment.CheckDriver().Message);
+```
+
+`CheckDriver()` 返回 `Ready`、`NotDetected`、`Incompatible`、`Unavailable` 或 `UnsupportedPlatform`，并提供 `IsAvailable` 和 `Message`。`NotDetected` 也可能表示设备被禁用或尚未启动；`Ready` 表示设备可访问且协议兼容，不保证会话空闲或已安装最新驱动。检测不会抢占、释放或续约其他控制器的会话。直接创建控制器遇到驱动缺失时会抛出异常，提示显式检测和安装。
+
 自签名包需要用户在首次安装时同意信任发布者的专用代码签名证书；它会加入本机 `Root` 和 `TrustedPublisher`，使系统信任该证书签名的代码。发布者私钥不会分发。设备安装策略仍然适用，系统也可能要求重启。安装器不更改 Secure Boot、内存完整性、测试模式或签名强制策略，不自动重启。
 
-包有三种状态：`Build.ps1` 默认重新编译的驱动为 `unsigned` / `-driver-dev`，禁止自动安装；仓库内置的自签名包是 `self-signed` / `-driver-local`，需要信任专用证书；公共代码签名发行包标记为 `trusted-publisher`。本地信任方案已经在 Windows 11、Secure Boot 开启的机器上安装成功，但不是微软 WHQL 认证。4.0.1 驱动使用有效期至 **2036-09-23（UTC+8）**的专用 RSA 4096 位代码证书，并附加 RFC 3161 时间戳。证书持续复用于后续构建，期限和私钥备份详见 [签名与分发](driver/SIGNING.md)。
+包有三种状态：`Build.ps1` 默认重新编译的驱动为 `unsigned` / `-driver-dev`，安装接口会拒绝该包；仓库内置的自签名包是 `self-signed` / `-driver-local`，需要信任专用证书；公共代码签名发行包标记为 `trusted-publisher`。本地信任方案已经在 Windows 11、Secure Boot 开启的机器上安装成功，但不是微软 WHQL 认证。4.0.1 驱动使用有效期至 **2036-09-23（UTC+8）**的专用 RSA 4096 位代码证书，并附加 RFC 3161 时间戳。证书持续复用于后续构建，期限和私钥备份详见 [签名与分发](driver/SIGNING.md)。
 
 当前驱动支持 **Windows 11 x64**；C# 调用方可以是 x64 或 x86。调用方自己的 .NET 10 应用仍需运行时或采用自包含发布。
 
-可在应用安装阶段提前安装，或检查内嵌状态：
+以下属性仅检查 DLL 内嵌包，不表示系统已经安装驱动；系统设备状态使用上面的 `CheckDriver()`：
 
 ```csharp
 Console.WriteLine(DriverDeployment.HasEmbeddedDriver);
@@ -33,7 +48,6 @@ Console.WriteLine(DriverDeployment.IsEmbeddedDriverSigned);
 Console.WriteLine(DriverDeployment.EmbeddedDriverSigningKind);
 Console.WriteLine(DriverDeployment.EmbeddedDriverCertificateExpires);
 Console.WriteLine(DriverDeployment.IsEmbeddedDriverTimestamped);
-DriverDeployment.InstallEmbeddedDriver(); // 需要安装时请求 UAC；不必在每次输入前调用。
 ```
 
 驱动文件安装进 Windows 驱动存储，临时提取文件在安装完成后清理。取消 UAC、签名不受信任、需要重启、设备被其他控制器占用等情况均会抛出明确异常。
@@ -82,21 +96,21 @@ await sequence.PlayAsync(input, repeat: 3);
 
 ## 交互式控制台
 
-完成本地构建后，双击 `Start-InputConsole.cmd`，或打开发布的 `InputSimulator.Console.exe`。签名发行版首次选择测试时先完成驱动安装，再开始倒计时。
+完成本地构建后，双击 `Start-InputConsole.cmd`，或打开发布的 `InputSimulator.Console.exe`。启动菜单和选择输入测试均不会自动安装。先选 `9` 检测驱动，需要安装时选 `I` 显式安装或更新，然后选择输入测试。
 
 1. 打开目标程序，控制台输入 `2` 测试 W 长按 2 秒。
 2. 在默认 5 秒倒计时内 Alt+Tab 切回目标，松开切换窗口使用的按键。
 3. 查看是否产生输入，再切回控制台选择下一项。
 
-`1` 短按 W，`3` 空格，`4` Shift + W，`5` 鼠标移动，`6` 鼠标按键，`7` 滚轮，`8` 自定义组合及重复次数，`9` 驱动包状态。`T` 修改倒计时，`K` 查看键名，`0` 退出。
+`1` 短按 W，`3` 空格，`4` Shift + W，`5` 鼠标移动，`6` 鼠标按键，`7` 滚轮，`8` 自定义组合及重复次数，`9` 检测驱动状态，`I` 安装或更新驱动。`T` 修改倒计时，`K` 查看键名，`0` 退出。预演模式下 `9` 和 `I` 均跳过系统设备操作。
 
 F8 在倒计时或执行中取消；控制台内也可以 Ctrl+C 取消。F8 通过系统键状态轮询检测，不屏蔽目标对 F8 的处理。预演不会连接驱动、安装驱动或向桌面发送输入：
 
 ```powershell
 dotnet run --project .\XFEExtension.NetCore.InputSimulator.Console -c Release -- --dry-run
-# 检查首次安装、连接、心跳和会话释放，不发送按键或鼠标移动：
+# 只检测设备及协议，不安装、不申请输入会话、不发送键鼠输入；就绪返回 0，否则返回 1：
 dotnet run --project .\XFEExtension.NetCore.InputSimulator.Console -c Release -- --driver-check
-# 已装旧版时，显式更新内嵌驱动和签名证书：
+# 显式安装或更新内嵌驱动，需要管理员授权：
 dotnet run --project .\XFEExtension.NetCore.InputSimulator.Console -c Release -- --driver-install
 ```
 

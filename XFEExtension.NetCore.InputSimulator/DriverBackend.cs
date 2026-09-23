@@ -2,7 +2,7 @@ using XFEExtension.NetCore.InputSimulator.Native;
 
 namespace XFEExtension.NetCore.InputSimulator;
 
-/// <summary>连接项目内置的 UMDF 虚拟 HID 驱动；缺失时首次调用自动部署签名驱动。</summary>
+/// <summary>连接已安装的 UMDF 虚拟 HID 驱动；驱动缺失或不可用时报告错误，不自动安装。</summary>
 /// <remarks>输入会话独占，同一时间只能有一个控制器。支持六个普通键及八个修饰键；不回退到软件注入。</remarks>
 public sealed class DriverBackend : IInputBackend
 {
@@ -10,7 +10,7 @@ public sealed class DriverBackend : IInputBackend
     private readonly object sync = new();
     private bool disposed;
 
-    /// <summary>连接驱动；首次安装需要 Windows 管理员授权。</summary>
+    /// <summary>连接已安装的驱动。使用 DriverDeployment 显式检测和安装驱动。</summary>
     public DriverBackend() : this(new DriverTransport()) { }
 
     internal DriverBackend(IDriverTransport transport)
@@ -19,7 +19,7 @@ public sealed class DriverBackend : IInputBackend
         try
         {
             var info = transport.Query();
-            if (info.Version != DriverProtocol.Version || info.Capabilities != DriverProtocol.Capabilities || info.MaxKeys != 6 || info.Reserved != 0)
+            if (!DriverProtocol.IsCompatible(info))
                 throw new NotSupportedException("已安装的 XFE 驱动与本 DLL 协议不匹配，请更新驱动后重新启动应用。");
         }
         catch { transport.Dispose(); throw; }
